@@ -143,6 +143,9 @@ def octal_to_string(octal):
         if i >= value:
             result += letter
             i -= value
+	else:
+	    result += "-"
+ return result
 
 
 
