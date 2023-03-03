@@ -1,0 +1,324 @@
+
+
+/*It is important to note that although the columns are output in the order you defined in the SELECT
+query, the rows will be returned in no specific order. You will learn how to output the result in a
+certain order in the ORDER BY section later in this chapter.
+A SELECT query can be broken down into five parts:
+1. Operation: The first part of a query describes what is going to be displayed. In this case, the
+word SELECT is followed by the names of columns combined with functions.
+2. Data: The next part of the query is the data, which is the FROM keyword, followed by one or
+more tables connected with reserved keywords indicating which data should be scanned for
+filtering, selection, and calculation.
+3. Condition: This is a part of the query that filters the data to show only rows that meet
+conditions usually indicated with WHERE.
+4. Grouping: This is a special clause that takes the rows of a data source and assembles them
+together using a key created by a GROUP BY clause, and then calculates an output for all rows
+with the same value in the GROUP BY key. You will learn more about this step in Chapter 4,
+Aggregate Functions for Data Analysis.
+5. Postprocessing: This is a part of the query that takes the results of the data and formats them by
+sorting and limiting the data, often using keywords such as ORDER BY and LIMIT.Take, for instance, the statement that you ran in Exercise 2.01, Running your first SELECT query.
+Suppose that, from the customers table, you wanted to retrieve the first name of all customers in
+the state of Arizona. You also want these names listed alphabetically. You could write the following
+SELECT query to retrieve this information:*/
+SELECT first_name
+FROM customers
+WHERE state='AZ'
+ORDER BY first_name;
+
+SELECT * FROM products;
+
+
+/*n the statements used in this section, SQL keywords such as SELECT and FROM are in uppercase,
+while the names of tables and columns are in lowercase. SQL statements (and keywords) are case
+insensitive. However, when you write your own SQL, it is generally recommended to follow certain
+conventions on the usage of case and indentation. It will help you understand the structure and
+purpose of the statement.
+Within the SELECT clause, the * symbol is shorthand for returning all the columns from a database.
+The semicolon operator (;) is used to tell the computer it has reached the end of the query, much as a
+period is used for a normal sentence. To return only specific columns from a query, you can simply
+replace the asterisk (*) with the names of the columns to be returned in the order you want them to be
+returned. For example, if you wanted to return the product_id column followed by the model
+column of the products table, you would write the following query:*/
+SELECT product_id, model FROM products;
+
+
+/*To return the model column first and the product_id column second, you would write this*/
+SELECT model, product_id FROM products;
+
+/*The WHERE clause is a piece of conditional logic that limits the amount of data returned. You can use
+the WHERE clause to specify conditions based on which the SELECT statement will retrieve specific
+rows. In a SELECT statement, you will usually find this clause placed after the FROM clause.
+The condition in the WHERE clause is generally a Boolean statement that can either be true or false for
+every row. In the case of numeric columns, these Boolean statements can use equals (=), greater than
+(>), or less than (<) operators to compare the columns against a value.
+For example, say you want to see the model names of the products with the model year of 2014 from
+the sample dataset. You would write the following query:*/
+SELECT model
+FROM products
+WHERE year=2014;
+
+
+
+/*you want to return models that were not only built in 2014, but also have a
+Manufacturer's Suggested Retail Price (MSRP) of less than $1,000. You can write the following
+query:*/
+SELECT model, year, base_msrp
+FROM products
+WHERE year=2014 AND base_msrp<=1000;
+
+/*Suppose you want to return any models that were released in the year 2014 or had a product
+type of automobile. You would write the following query: You already know that there is one product, Lemon Limited Edition, with a year of 2014.
+The rest of the products in the example have been listed with automobile as the product_type.
+You are seeing the combined dataset of year=2014 together with
+product_type='automobile'. That is exactly what the OR operator does.*/
+SELECT Model, product_type
+FROM products
+WHERE year=2014 OR product_type='automobile';
+
+
+
+/*When using more than one AND or OR condition, you may need to use parentheses to separate and
+position pieces of logic together. This will ensure that your query works as expected and is as readable
+as possible. For example, if you wanted to get all products with models between the years 2016 and
+2018, as well as any products that are scooters, you could write the following:*/
+
+SELECT *
+FROM products
+WHERE year>2016 
+AND year > 2018
+OR product_type='scooter';
+
+/*However, to clarify the WHERE clause, it would be preferable to write the following:*/
+SELECT *
+FROM products
+WHERE (year>2016 AND year<2018)
+OR product_type='scooter';
+
+/*you also might want to refine your
+criteria by retrieving rows that contain (or do not contain) one or more specific values in one or more
+of their columns. This is where the IN and NOT IN clauses come in handy.
+For example, you are interested in returning all models from the years 2014, 2016, or 2019. You
+could write a query such as this:*/
+SELECT model, year
+FROM products
+WHERE year = 2014
+OR year = 2016
+OR year = 2019;
+
+/*However, this is tedious to write. Using IN, you can instead write the following:*/
+SELECT model, year
+FROM products
+WHERE year IN (2014, 2016, 2019);
+
+
+/*Conversely, you can also use the NOT IN clause to return all the values that are not in a list of values.
+For instance, if you wanted all the products that were not produced in the years 2014, 2016, and
+2019, you could write the following:*/
+SELECT model, year
+FROM products
+WHERE year NOT IN (2014, 2016, 2019);
+
+/*SQL queries will order rows as the database finds them if they are not given specific instructions to do
+otherwise. For many use cases, this is acceptable. However, you will often want to see rows in a
+specific order.
+For instance, you want to see all the products listed by the date when they were first produced, from
+earliest to latest. The method for doing this in SQL would be using the ORDER BY clause as follows:*/
+SELECT model, production_start_date
+FROM products
+ORDER BY production_start_date;
+
+/*If an order sequence is not explicitly mentioned, the rows will be returned in ascending order.
+Ascending order simply means the rows will be ordered from the smallest value to the highest value of
+the chosen column or columns. In the case of things such as text, this means arranging in alphabetical
+order. You can make the ascending order explicit by using the ASC keyword. For the last query, this
+could be achieved by writing the following:*/
+SELECT model, production_start_date
+FROM products
+ORDER BY production_start_date ASC;
+
+/*If you want to extract data in descending order, you can use the DESC keyword. If you wanted to fetch
+manufactured models ordered from newest to oldest, you would write the following query:*/
+SELECT model, production_start_date
+FROM products
+ORDER BY production_start_date DESC;
+
+/*Also, instead of writing the name of the column you want to order by, you can refer to the position
+number of that column in the query's SELECT clause. For instance, you wanted to return all the
+models in the products table ordered by product ID. You could write the following:*/
+SELECT product_id, model
+FROM products
+ORDER BY product_id;
+
+/*However, because product_id is the first column in the SELECT statement, you could instead
+write the following:*/
+SELECT product_id, model
+FROM products
+ORDER BY 1;
+
+/*Finally, you can order by multiple columns by adding additional columns after ORDER BY, separated
+with commas. For instance, you want to order all the rows in the table first by the year of the model
+from newest to oldest, and then by the MSRP from least to greatest. You would then write the
+following query:*/
+SELECT *
+FROM products
+ORDER BY year DESC, base_msrp ASC;
+
+/*Most tables in SQL databases tend to be quite large and, therefore, returning every single row is
+unnecessary. Sometimes, you may want only the first few rows. For this scenario, the LIMIT keyword
+comes in handy. Imagine that you wanted to only get the model of the first five products that were
+produced by the company. You could get this by using the following query:*/
+SELECT model
+FROM products
+ORDER BY production_start_date
+LIMIT 5;
+/*When you are not familiar with a table or query, it is a common concern that running a SELECT
+statement will accidentally return many rows, which can take up a lot of time and machine bandwidth.
+As a common precaution, you should use the LIMIT keyword to only retrieve a small number of rows
+when you run the query for the first time.*/
+
+
+
+/*Often, some entries in a column may be missing. This could be for a variety of reasons. Perhaps the
+data was not collected or not available at the time that the data was collected. Perhaps the absence of a
+value is representative of a certain state in the row and provides valuable information.
+Whatever the reason, you are often interested in finding rows where the data is not filled in for a
+certain value. In SQL, blank values are often represented by the NULL value. For instance, in the
+products table, the production_end_date column having a NULL value indicates that the
+product is still being made. In this case, to list all products that are still being made, you can use the
+following query:*/
+SELECT *
+FROM products
+WHERE production_end_date IS NULL;
+
+/*If you are only interested in products that are not being produced anymore, you can use the IS NOT
+NULL clause, as shown in the following query:*/
+SELECT *
+FROM products
+WHERE production_end_date IS NOT NULL;
+
+
+
+
+
+/*For
+instance, after a few days at your new job, you finally get access to the company database. Your boss
+has asked you to help a sales manager who does not know SQL particularly well. The sales manager
+would like a couple of different lists of salespeople.
+First, you need to generate a list of the first 10 salespersons hired by dealership 17, that is, the
+salespersons with oldest hire_date, ordered by hiring date, with the oldest first. Second, you need
+to get all salespeople that were hired in 2021 and 2022 but have not been terminated, that is, the
+hire_date must be later than 2021-01-01, and terminiation_date is NULL, ordered by hire
+date, with the latest first. Finally, the manager wants to find a salesperson that was hired in 2021 but
+only remembers that their first name starts with "Nic." He has asked you to help find this person. You
+will use your SQL skill to help the manager to achieve these goals.*/
+
+/*
+1. Open pgAdmin, connect to the sqlda database, and open SQL query editor.
+2. Examine the schema for the salespeople table from the schema drop-down list. Get
+familiar with the names of the columns in the following figure:
+3. Execute the following query to get the usernames of salespeople from dealership_id
+17, sorted by their hire_date values, and then set LIMIT to 10:*/
+SELECT *
+FROM salespeople
+WHERE dealership_id = 17
+ORDER BY hire_date
+LIMIT 10;
+
+/*
+Now you have the list of the first 10 salespersons hired by dealership 17, that is, the salespersons with
+the oldest hire_date, ordered by hiring date, with the oldest first.
+
+4. Now, to find all the salespeople that were hired in 2021 and 2022 but have not been terminated,
+that is, the hire_date must be later than 2021-01-01, and termination_date is null,
+ordered by hire date, with the latest first:*/
+SELECT *
+FROM salespeople
+WHERE hire_date >= '2021-01-01'
+AND termination_date IS NULL
+ORDER BY hire_date DESC;
+
+/*
+5. Now, find a salesperson that was hired in 2021 and whose first name starts with Nic.*/
+SELECT *
+FROM salespeople
+WHERE first_name LIKE 'Nic%'
+AND hire_date >= '2021-01-01'
+AND hire_date <= '2021-12-31';
+
+/*
+The marketing department has decided that they want to run a series of marketing campaigns to help
+promote a sale. To do this, they need the email communication records for ZoomZoom customers in
+the state of Florida, and details of all customers in New York City. They also need the customer phone
+numbers with specific orders. The following are the steps to complete the activity:
+1. Open pgAdmin, connect to the sqlda database, and open SQL query editor.
+2. Examine the schema for the customers table from the schema drop-down list. Get yourself
+familiar with the columns in this table.
+3. Write a query that retrieves all emails for ZoomZoom customers in the state of Florida in
+alphabetical order.
+4. Write a query that pulls all first names, last names, and emails for ZoomZoom customers in
+New York City in the state of New York. They should be ordered alphabetically, with the last
+name followed by the first name.
+5. Write a query that returns all customers with a phone number ordered by the date the customer
+was added to the database.*/
+
+/*
+2. Execute the following query to fetch customers' emails in the state of Florida in alphabetical
+order:*/
+SELECT email
+FROM customers
+WHERE state='FL'
+ORDER BY email;
+
+/*
+3. Execute the following query to pull all the first names, last names, and email addresses for
+ZoomZoom customers in New York City, New York. The customers should be orderedalphabetically, with the last name followed by the first name:*/
+SELECT first_name, last_name, email
+FROM customers
+WHERE city='New York City' AND state='NY'
+ORDER BY last_name, first_name;
+
+/*
+4. Execute the following query to fetch all customers that have a phone number ordered by the
+date the customer was added to the database:*/
+SELECT *
+FROM customers
+WHERE phone IS NOT NULL
+ORDER BY date_added;
+
+/*
+Creating Tables
+Now that you know how to read data from tables, you will look at how to create new tables. There are
+two ways to do this—by creating blank tables or by using SELECT queries.
+
+
+Creating Blank Tables
+To create a new blank table, you use the CREATE TABLE statement. This statement takes the
+following structure:
+
+CREATE TABLE {table_name} (
+{column_name_1} {data_type_1} {column_constraint_1},
+{column_name_2} {data_type_2} {column_constraint_2},
+{column_name_3} {data_type_3} {column_constraint_3},
+…
+{column_name_last} {data_type_last} {column_constraint_last}
+);
+
+Here, {table_name} is the name of the table, {column_name} is the name of the column,
+{data_type} is the data type of the column, and {column_constraint} is one or more
+optional keywords giving special properties to the column. Before discussing how to use the CREATE
+TABLE query, you should first learn about column data types and column constraints.
+
+Basic Data Types of SQL
+Each column in a table has a data type. You will explore the major data types of PostgreSQL here.
+These types include:
+Numeric
+Character
+Boolean
+Datetime
+Data structures (array and JSON)
+*/
+
+
+
+
+
