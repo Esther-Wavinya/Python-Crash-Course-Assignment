@@ -1,0 +1,4 @@
+settings.py
+secret_key.txt
+db.sqlite3
+.env

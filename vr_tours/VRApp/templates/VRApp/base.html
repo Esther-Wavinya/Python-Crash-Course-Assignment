@@ -1,0 +1,82 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+  {%load static%}
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static '/css/main.css' %}">
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link rel="icon" href="{% static '/images/logo2.png' %}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bulma@0.9.1/css/bulma.min.css" rel='stylesheet' type='text/css' />
+    
+    <title>Home</title>
+</head>
+<body>
+        <nav class="navbar is-fixed-top is-dark" role="navigation" aria-label="main navigation">
+            <div class="navbar-brand">
+              <a class="navbar-item" href="{%url 'home'%}">
+                <img src="{% static 'images/logo2.png' %}" width="112" height="28" alt="VRTours">
+              </a>
+          
+              <a role="button" class="navbar-burger" id="burger" aria-label="menu" aria-expanded="false" data-target="navbarBasicExample">
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+              </a>
+            </div>
+          
+            <div id="navbarBasicExample" class="navbar-menu">
+              <div class="navbar-start">
+                <a class="navbar-item" href="{% url 'home'%}">
+                  Home
+                </a>
+          
+                <a class="navbar-item">
+                  Country
+                </a>
+          
+                <a class="navbar-item">
+                  City
+                </a>
+      
+                <a class="navbar-item" href="{% url 'historical_sites' %}">
+                  Historical Sites
+                </a>
+      
+                <a class="navbar-item">
+                  Contact Us
+                </a>
+              </div>
+          
+              <div class="navbar-end">
+                <a href="{% url 'cart'%}"  class="navbar-item cart">
+                    CART
+                    <ion-icon name="basket"></ion-icon><span>{{cartItems}}</span>
+                </a>
+              </li>
+                <div class="navbar-item">
+                  <div class="buttons">
+                    <a class="button is-primary is-outlined">
+                      <strong>Sign up</strong>
+                    </a>
+                    <a class="button is-info is-outlined">
+                      Log in
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </nav>
+       
+
+    <script src="https://unpkg.com/ionicons@5.4.0/dist/ionicons.js"></script>
+    <script src="{% static '/js/main.js'%}"></script>
+    <script src="{% static '/js/burger.js'%}"></script>
+    <script src="{% static 'js/cart.js'%}"></script>
+    {% block content%}
+    
+    {%endblock%}
+</body>
+</html> -->

@@ -1,0 +1,24 @@
+{% extends 'VRApp/main.html' %}
+{% load static %}
+{% block title %}Shop | Esovis VR{% endblock %}
+{% block content %}
+
+	<div class="row">
+        {% for product in products %}
+		<div class="col-lg-4">
+			<img class="thumbnail" src="{{product.imageURL}}">
+			<div class="box-element product">
+				<h6><strong>{{product.name}}</strong></h6>
+				<hr>
+
+				<button   data-product ="{{product.id}}" data-action = "add" class="btn add-btn update-cart" style="background: linear-gradient(#C79F4E , #E8CD77 ); color: white;border: none;">Add to Cart</button>
+				<a class="btn" style =" border-color: #C79F4E ;"href="#">View</a>
+				<h4 style="display: inline-block; float: right"><strong>${{product.price|floatformat:2}}</strong></h4>
+
+            </div>
+        </div>
+        {% endfor %}
+        
+	</div>
+
+{% endblock content %}

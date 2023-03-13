@@ -1,0 +1,518 @@
+html{
+  scroll-behavior: smooth;
+}
+body {
+  background-color: hsl(0, 0%, 98%);
+  overflow-x: hidden;
+ 
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: hsl(0, 0%, 30%);
+}
+
+.box-element {
+  box-shadow: hsl(0, 0%, 80%) 0 0 16px;
+  background-color: #fff;
+  border-radius: 4px;
+  padding: 10px;
+}
+
+.thumbnail {
+  width: 100%;
+  height: 200px;
+  -webkit-box-shadow: -1px -3px 5px -2px rgba(214, 214, 214, 1);
+  -moz-box-shadow: -1px -3px 5px -2px rgba(214, 214, 214, 1);
+  box-shadow: -1px -3px 5px -2px rgba(214, 214, 214, 1);
+}
+
+.product {
+  border-radius: 0 0 4px 4px;
+}
+
+#cart-icon {
+  width: 25px;
+  display: inline-block;
+  margin-left: 15px;
+}
+
+#cart-total {
+  display: block;
+  text-align: center;
+  color: #fff;
+  background-color: red;
+  width: 20px;
+  height: 25px;
+  border-radius: 50%;
+  font-size: 14px;
+}
+
+.col-lg-4,
+.col-lg-6,
+.col-lg-8,
+.col-lg-12 {
+  margin-top: 10px;
+}
+
+.btn {
+  border-radius: 0;
+}
+
+.row-image {
+  width: 100px;
+}
+
+.form-field {
+  width: 250px;
+  display: inline-block;
+  padding: 5px;
+}
+
+.cart-row {
+  display: flex;
+  align-items: flex-stretch;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #ececec;
+}
+
+.quantity {
+  display: inline-block;
+  font-weight: 700;
+  padding-right: 10px;
+}
+
+.chg-quantity {
+  width: 12px;
+  cursor: pointer;
+  display: block;
+  margin-top: 5px;
+  transition: 0.1s;
+}
+
+.chg-quantity:hover {
+  opacity: 0.6;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.nav-item:hover {
+  background: linear-gradient(#c79f4e, #e8cd77);
+  border: none;
+}
+.form-inline .btn:hover {
+  background: linear-gradient(#c79f4e, #e8cd77);
+  border: none;
+}
+
+.scrollable-menu {
+  height: auto;
+  max-height: 200px;
+  overflow-x: hidden;
+}
+.jumbotron{
+  margin-bottom: 0 !important;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-direction: column;
+}
+.jumbotron-image {
+  background-image: url("/static/images/tiger.jpg");
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.spacing h1 {
+  color: #ffffff;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+@media(min-width:200px){ 
+  .spacing h1{
+    font-size: 30px;}
+}
+@media(min-width:576px){ 
+  .spacing h1{
+    font-size:60px ;}
+}
+@media(min-width:768px){ 
+  .spacing h1{
+    font-size: 5.5rem;}
+}
+.spacing p{
+  color: white;
+}
+.box-shadow-hover {
+  transition: 0.3s;
+}
+.box-shadow-hover:hover {
+  transform: scale(1.01);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+}
+.card-img-top-c {
+  width: 100%;
+  height: 15vw;
+  object-fit: cover;
+}
+/* Small devices (landscape phones, 576px and up) */
+@media (min-width: 576px) {
+  .card-img-top-c {
+    height: 21vw;
+    object-fit: cover;
+  }
+}
+/* Medium devices (tablets, 768px and up) */
+@media (min-width: 768px) {
+  .card-img-top-c {
+    height: 16vw;
+  }
+}
+/* Large devices (desktops, 992px and up) */
+@media (min-width: 992px) {
+  .card-img-top-c {
+    height: 11vw;
+  }
+}
+/* Extra large devices (large desktops, 1200px and up) */
+@media (min-width: 992px) {
+  .card-img-top-c {
+    height: 11vw;
+  }
+}
+.jumbotron-image-1 {
+  background-image: url("/static/images/blossoms.jpg");
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.9;
+}
+
+@media (min-width: 375px) {
+  .spacing {
+    height: 60vw;
+  }
+}
+@media (min-width: 576px) {
+  .spacing {
+    height: 60vw;
+  }
+}
+@media (min-width: 768px) {
+  .spacing {
+    height: 50vw;
+  }
+}
+.jumbotron-image-2 {
+ 
+  background-image:linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url("/static/images/hero-image.jpg");
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.8;
+}
+
+
+.flex-container {
+  display: flex;
+  flex-direction: row;
+  background-color: #604087;
+}
+
+.flex-left {
+  flex: 25%;
+  margin: 20px;
+  padding: 30px;
+}
+.flex-left h3{
+  text-transform: uppercase;
+  color: white;
+}
+.flex-left h1{
+  font-weight: bolder;
+  font-size: 70px;
+  line-height: 70px;
+  color: white;
+}
+
+.flex-right {
+  flex: 75%;
+  margin: 20px;
+  padding: 30px;
+  display: flex;
+  flex-direction: row;
+  height: auto;
+   color: white;
+}
+.flex-right h3{
+  color: white;
+}
+.flex-right-child-1{
+  flex: 50%;
+  margin: 10px;
+
+}
+.flex-right-child-2{
+  flex: 50%;
+  margin: 10px;
+}
+
+@media(max-width:700px){
+  .flex-right{
+    flex-direction: column;
+    
+  }
+  .flex-container{
+    flex-direction: column;
+    height: auto;
+  }
+}
+
+
+.featured-live-tours{
+  margin: 20px 20px 0px 0px;
+  padding: 30px;
+}
+.featured-live-tours h3{
+  color: #604087;
+  text-transform: uppercase;
+}
+.featured-tour-image{
+  background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),url('/static/images/biel-morro-d0xjEv-WJQk-unsplash_1.jpg');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  width: 100%;
+  height: 700px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.featured-tour-text{
+  padding: 20px;
+  text-align: center;
+}
+.featured-tour-text >h1{
+  color: white;
+  text-transform: uppercase;
+}
+.featured-tour-text p{
+  color: white;
+}
+@media(min-width:320px){
+  .container .featured-section ,.featured-tour-text h1{
+    font-size: 40px;
+  }
+}
+.featured-section{
+  margin-bottom: 50px;
+}
+.btnClass {
+  width: 200px;
+  background: linear-gradient(#c79f4e, #e8cd77);
+  font-size: 20px;
+  color: white;
+  margin-top: 30px;
+}
+.hero_btn{
+ width: 350px;
+ height: 50px;
+ background: linear-gradient(#c79f4e, #e8cd77);
+ color: white;
+ font-size: 20px;
+ 
+
+}
+@media(min-width:300px){
+  .hero_btn{
+    width: 200px;
+    height: 35px;
+    font-size: 15px;
+    text-align: center;
+  }
+}
+@media(min-width:768px){
+  .hero_btn{
+    width: 300px;
+    height: 40px;
+    font-size: 15px;
+    text-align: center;
+  }
+}
+@media(min-width:992px){
+  .hero_btn{
+    width: 350px;
+    height: 50px;
+    font-size:20px;
+    text-align: center;
+  }
+}
+.what_they_say{
+  text-align: center;
+  margin: 20px ;
+  padding: 40px 0px 0px 0px;
+}
+.what_they_say h3{
+  color: white;
+}
+.what_they_say hr{
+  border: 2px solid white;
+  width: 150px;
+  margin-bottom: 40px;
+}
+@media(min-width:320px){
+  .what_they_say h3{
+    font-size: 30px;
+  }
+}
+@media(min-width:768px){
+  .what_they_say h3{
+    font-size: 40px;
+  }
+}
+@media(min-width:992px){
+  .what_they_say h3{
+    font-size: 50px;
+  }
+}
+#demo {
+  max-width: 100%;
+  padding: 30px;
+  margin: auto;
+
+}
+.carousel-caption {
+  position: initial;
+  z-index: 10;
+  padding: 5rem 8rem;
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: bold;
+  line-height: 2rem
+}
+
+@media(max-width:767px) {
+  .carousel-caption {
+      position: initial;
+      z-index: 10;
+      padding: 3rem 2rem;
+      text-align: center;
+      font-size: 0.7rem;
+      font-weight: bold;
+      line-height: 1.5rem
+  }
+}
+
+.carousel-caption img {
+  width: 6rem;
+  border-radius: 5rem;
+  margin-top: 2rem
+}
+
+@media(max-width:767px) {
+  .carousel-caption img {
+      width: 4rem;
+      border-radius: 4rem;
+      margin-top: 1rem
+  }
+}
+
+#image-caption {
+  font-style: normal;
+  font-size: 1rem;
+  margin-top: 0.5rem
+}
+
+@media(max-width:767px) {
+  #image-caption {
+      font-style: normal;
+      font-size: 0.6rem;
+      margin-top: 0.5rem
+  }
+}
+
+.carousel-control-prev {
+  justify-content: flex-start
+}
+
+.carousel-control-next {
+  justify-content: flex-end
+}
+
+.carousel-control-prev,
+.carousel-control-next {
+  transition: none;
+  opacity: unset
+}
+.featured-tour-image-1{
+  background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),url('/static/images/marabella.jpg');
+  background-size: cover;
+  background-repeat: no-repeat;
+  width: 100%;
+  height: 700px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+@media(max-width:375px){
+  .upcoming_virtual_tours h1{
+    font-size: 2rem;
+  }
+  .upcoming_virtual_tours h3{
+    font-size: 0.5rem;
+  }
+}
+@media(max-width:576px){
+  .upcoming_virtual_tours h1{
+    font-size: 3rem;
+  }
+  .upcoming_virtual_tours h3{
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 567px) {
+
+  .footer {
+    height: 700px;
+  }
+}
+
+footer {
+padding-top: 50px;
+background-color: #604087;
+color: #bbb;
+height:400px;
+width:100%
+}
+
+
+
+footer a {
+color: white;
+text-decoration:none;
+}
+
+footer a:hover, footer a:focus {
+color: #e8cd77;
+text-decoration:none;
+border-bottom:1px dotted #e8cd77;
+}
+
+footer .form-control {
+  background-color: #fff;
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  border: none;
+  resize: none;
+  color: #d1d2d2;
+  padding: 0.7em 1em;
+}
