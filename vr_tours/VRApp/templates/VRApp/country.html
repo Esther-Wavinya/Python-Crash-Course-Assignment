@@ -1,0 +1,33 @@
+{% extends 'VRApp/main.html'%} {% load static %} {% block title %}Country |
+Esovis VR{% endblock %}{% block content%}
+<br />
+<br />
+<div class="container">
+  <div class="row">
+    <div class="card mb-3 mx-auto" style="width: 700px">
+      <img
+        src="{{country.imageURL}}"
+        class="card-img-top img-fluid"
+        alt="..."
+        style="width: 700px"
+      />
+      <div class="card-body">
+        <h5 class="card-title">{{country.title}}</h5>
+        <p class="card-text">{{country.description}}</p>
+        <a
+          href="{% url 'shop'%}"
+          class="btn btn-block"
+          style="
+            border: none;
+            color: white;
+            background: linear-gradient(#c79f4e, #e8cd77);
+            font-weight: bold;
+          "
+        >
+          Take me Here!</a
+        >
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content%}

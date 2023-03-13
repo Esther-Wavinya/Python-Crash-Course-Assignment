@@ -1,0 +1,182 @@
+{% extends 'VRApp/main.html'%} {% load static %} {% block title %}Home| Esovis
+VR{% endblock %} {% block content%}
+<!-- Hero image and text section -->
+<div class="jumbotron jumbotron-fluid jumbotron-image-2">
+  <div class="container spacing">
+    <h1>Explore the <br/> world with <br/> Virtual Tours</h1>
+    <p>Lorem ipsum dolor sit amet consectetur adipisicing elit.</p>
+    <a href="{% url 'shop'%}" class="btn hero_btn" >START TRAVELING TODAY</a>
+  </div>
+</div>
+<!-- About us section -->
+<div class="flex-container">
+  <div class="flex-left">
+    <h3>About Us</h3>
+    <h1>Travel the world!</h1>
+    <strong style="color: white">from your couch!</strong>
+  </div>
+  <div class="flex-right">
+    <div class="flex-right-child-1">
+      <h3>VIRTUAL TOURS</h3>
+      <p>
+        We hand-pick the best, most exciting and coveted experiences around the
+        world to turn into virtual tours.
+      </p>
+      <h3>LIVE VIRTUAL TOURS</h3>
+      <p>
+        We provide live sessions where you can ask your burning questions, learn
+        more about the culture from a local and simply hang out with friends in
+        a new way.
+      </p>
+    </div>
+    <div class="flex-right-child-2">
+      <h3>REAL GUIDES</h3>
+      <p>
+        We work with real, professional tour guides who share their passion and
+        knowledge in the virtual tours.
+      </p>
+      <h3>LATEST TECHNOLOGY</h3>
+      <p>
+        We are using immersive technologies to help you feel like you are really
+        there.
+      </p>
+    </div>
+  </div>
+</div>
+
+
+<!-- Featured Virtual Tours section -->
+<div class="container featured-section">
+  <div class="row">
+    <div class="featured-live-tours">
+      <h3>Available now!</h3>
+      <h1 class="display-3">Featured <br/><strong>Virtual tour</strong></h1>
+    </div>
+  </div>
+  <div class="featured-tour-image">
+      <div class="featured-tour-text">
+        <h1 class="display-4" style="font-weight: bolder;">Secrets of barcelona</h1>
+        <p>
+          An infinite number of mythical spots and stories lay hidden in this
+          magical city. Join us on a virtual experience of the Barcelona that no
+          other tour guide will show you.
+        </p>
+        <a href="{% url 'shop'%}" class="btn btnClass">TOUR NOW</a>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<!-- carousel -What they say section -->
+<div class="container-fluid" style=" background-color: #604087;">
+  <div class="what_they_say">
+    <hr>
+    <h3>WHAT THEY SAY</h3>
+  </div>
+  <div id="demo" class="carousel slide" data-ride="carousel">
+      <div class="carousel-inner">
+          <div class="carousel-item active">
+              <div class="carousel-caption">
+                  <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. At maiores fugiat ipsa praesentium dolore quod odit quo non saepe sequi.</p> 
+                  <img src="https://i.imgur.com/lE89Aey.jpg">
+                  <div id="image-caption">Ahmed, London </div>
+              </div>
+          </div>
+          <div class="carousel-item">
+              <div class="carousel-caption">
+                  <p>Lorem ipsum dolor sit, amet consectetur adipisicing elit. Deserunt quisquam cumque officiis laboriosam debitis rem perspiciatis est voluptate totam? Earum?</p> <img src="https://i.imgur.com/QptVdsp.jpg" class="img-fluid">
+                  <div id="image-caption">Will, Boston</div>
+              </div>
+          </div>
+          <div class="carousel-item">
+              <div class="carousel-caption">
+                  <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Autem beatae aspernatur cumque ipsum nihil! Exercitationem non quam praesentium. Nihil, blanditiis?</p> <img src="https://i.imgur.com/jQWThIn.jpg" class="img-fluid">
+                  <div id="image-caption">Steve, New York</div>
+              </div>
+          </div>
+      </div> 
+      <a class="carousel-control-prev" href="#demo" role="button" data-slide="prev">
+        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+        <span class="sr-only">Previous</span>
+      </a>
+      <a class="carousel-control-next" href="#demo" role="button" data-slide="next">
+        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+        <span class="sr-only">Next</span>
+      </a>
+  </div>
+</div>
+<br>
+<!--Upcoming Virtual Tours section -->
+<div class="container featured-section">
+  <div class="row upcoming_virtual_tours">
+    <div class="featured-live-tours">
+      <h3>Coming soon!</h3>
+      <br>
+      <h1 class="display-4" style="color: hsl(0, 0%, 30%);">UPCOMING</h1>
+      <h1 class="display-4"><strong>Virtual tours</strong></h1>
+    </div>
+  </div>
+  <div class="featured-tour-image-1">
+      <div class="featured-tour-text">
+        <h1 class="display-4" style="font-weight: bolder;">Marbella Spain</h1>
+        <p>
+          Lorem ipsum dolor, sit amet consectetur adipisicing elit. Quis, accusantium dolorum. Hic voluptatem dolores animi harum qui reprehenderit deleniti saepe!
+        </p>
+        <a href="{% url 'signup'%}"style="font-weight: bold;" class="btn btnClass">SIGN UP NOW</a>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- footer section
+ -->
+ <footer class="footer">
+  <div class="container">
+      <div class="row">
+          <div class="col-md-5">
+              <div class="row">
+                  <div class="col-6">
+                      <ul class="list-unstyled">
+                          <li><a href="">Product</a></li>
+                          <li><a href="">Benefits</a></li>
+                          <li><a href="">Partners</a></li>
+                          <li><a href="">Team</a></li>
+                      </ul>
+                  </div>
+                  <div class="col-6">
+                      <ul class="list-unstyled">
+                          <li><a href="">Blog</a></li>
+                          <li><a href="">Support</a></li>
+                          <li><a href="">Legal Terms</a></li>
+                          <li><a href="">About</a></li>
+                      </ul>
+                  </div>
+              </div>
+              <ul class="nav">
+                  <li class="nav-item"><a href="" class="nav-link pl-0"><i class="fa fa-facebook fa-lg"></i></a></li>
+                  <li class="nav-item"><a href="" class="nav-link"><i class="fa fa-twitter fa-lg"></i></a></li>
+                  <li class="nav-item"><a href="" class="nav-link"><i class="fa fa-instagram fa-lg"></i></a></li>
+              </ul>
+              <br>
+          </div>
+          <div class="col-md-2">
+              <h5 class="text-md-right" style="color: white;">Contact Us</h5>
+          </div>
+          <div class="col-md-5">
+              <form id="contactform">
+                  <fieldset class="form-group">
+                      <input type="email" class="form-control" id="exampleInputEmail1" placeholder="Enter email">
+                  </fieldset>
+                  <fieldset class="form-group">
+                      <textarea class="form-control" id="exampleMessage" placeholder="Message"></textarea>
+                  </fieldset>
+                  <fieldset class="form-group text-xs-right">
+                      <button type="button" class="btn btn-secondary-outline btn-lg">Send</button>
+                  </fieldset>
+              </form>
+          </div>
+      </div>
+  </div>
+</footer>
+ {%endblock content%}
