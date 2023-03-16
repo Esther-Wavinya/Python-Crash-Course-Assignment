@@ -182,6 +182,55 @@ Another way to insert data into a table is to use the **INSERT** statement with 
 INSERT INTO {table_name} ({column_1], {column_2}, …{column_last})
 {select_query};
 ```
+Here, **{table_name}** is the name of the table into which you want to insert the data, **{column_1}, {column_2}, … {column_last}** is a list of the columns whose values you want to insert, and **{select query}** is a query with the same structure as the values you want to insert into the table.
+
+Take the example of the **products_2014** table. You have created it with a **SELECT** query with one row. Earlier in this section, you have inserted one row into it. So, now it contains two rows. If you also want to insert the products from 2016, you could use the following query, which inserts one more row into the table:
+
+```
+INSERT INTO products_2014(
+product_id, model, year, product_type, base_msrp,
+production_start_date, production_end_date
+)
+SELECT*
+FROM products
+WHERE year=2016;
+```
+This query produces the following result:
+![The Products_2014 table after a successful INSERT INTO query!](images/2014.png)
+
+Now it contains three rows from three different ways of inserting data: one row from **CREATE** as the result of a **SELECT** query, one row from an **INSERT** with data, and one row from **INSERT** using the result of a **SELECT** query.
+
+## Updating existing rows
+Sometimes, you may need to update the values of the data present in a table. To do this, you can use the **UPDATE** statement:
+```
+UPDATE {table_name} SET
+{column_1} = {column_value_1},
+{column_2} = {column_value_2},
+…
+{column_last} = {column_value_last}
+WHERE {conditional};
+```
+Here, **{table_name}** is the name of the table with data that will be changed, **{column_1}, {column_2},… {column_last}** is the list of columns whose values you want to change, **{column_value_1}, {column_value_2}, … {column_value_last}** is the list of new values you want to update into those columns, and **{WHERE}** is a conditional statement like the one you would find in a **SELECT** query.
+
+To illustrate its use of the **UPDATE** statement, imagine that, for the rest of the year, the company has decided to sell all scooter models before 2018 for $299.99. You could change the data in the **products_2014** table using the following query:
+```
+UPDATE Products_2014 SET
+base_msrp = 299.99
+WHERE product_type = 'scooter'
+AND year<2018;
+```
+This query produces the following output. You can see that the **base_msrp** column of all three records has been updated to **299.99** because they are all scooters manufactured before 2018.
+![Successful update of the products_2014 table!](images/299.png)
+
+
+
+
+
+
+
+
+
+
 
 
 
