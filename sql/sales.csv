@@ -1,0 +1,11 @@
+"salesperson_id","dealership_id","title","first_name","last_name","suffix","username","gender","hire_date","termination_date"
+52,17,NULL,"Bobbi","McKeon",NULL,"bmckeon1f","Female","2017-12-08 00:00:00",NULL
+88,17,NULL,"Eldin","Addenbrooke",NULL,"eaddenbrooke2f","Male","2018-03-03 00:00:00",NULL
+189,17,NULL,"Abby","Drewery",NULL,"adrewery58","Male","2018-04-28 00:00:00",NULL
+249,17,NULL,"Tristan","Ainge",NULL,"tainge6w","Male","2018-08-11 00:00:00",NULL
+187,17,NULL,"Tyson","Kerford",NULL,"tkerford56","Male","2018-12-23 00:00:00",NULL
+86,17,NULL,"Willie","Gullen",NULL,"wgullen2d","Male","2019-03-13 00:00:00",NULL
+3,17,NULL,"Ethyl","Sloss","IV","esloss2","Female","2019-04-07 00:00:00",NULL
+150,17,NULL,"Jermaine","Bamell",NULL,"jbamell45","Female","2019-11-14 00:00:00",NULL
+1,17,NULL,"Electra","Elleyne",NULL,"eelleyne0","Female","2020-01-26 00:00:00",NULL
+84,17,"Ms","Klemens","Schneidau","II","kschneidau2b","Male","2020-01-27 00:00:00",NULL
