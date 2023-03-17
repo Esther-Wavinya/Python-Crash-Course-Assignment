@@ -642,7 +642,22 @@ The following is the output of the code:
 ![Emails are full outer joined to the customers table!](images/fulloutrt.png)
 
 ## Cross Joins
+Cross join is a join type that has no join predicate. That means every row from the "left" table will be matched to all the rows in the "right" table, regardless of whether they are related or not. It is also
+referred to as the Cartesian product. It is named "Cartesian" after the French mathematician René Descartes, who raised the idea of this type of operation. It can be invoked using a **CROSS JOIN** clause, followed by the name of the other table. To better understand this, take the example of the **products** table.
 
+A common analysis is called market basket analysis, which studies the selling patterns between multiple products. For example, diapers are usually sold together with baby wipes. So, if you are running a two-month giveaway for diapers for marketing purposes and expect more customers to
+come to the diaper aisle or web page, you may want to place baby wipes there too. To perform market basket analysis, you want to know every possible combination of two products that you could create from a given set of products (such as the ones found in the products table) to create a two-month giveaway for marketing purposes. You can use a cross join to get the answer to the question using the following query:
+```
+SELECT
+  P1.product_id, p1.model,
+  P2.product_id, p2.model
+FROM
+  products p1
+CROSS JOIN
+  products p2;
+```
+The output of this query is as follows:
+![The cross join of a product to itself!](images/CR.png)
 
 
 
