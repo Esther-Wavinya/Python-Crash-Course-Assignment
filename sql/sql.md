@@ -222,7 +222,187 @@ AND year<2018;
 This query produces the following output. You can see that the **base_msrp** column of all three records has been updated to **299.99** because they are all scooters manufactured before 2018.
 ![Successful update of the products_2014 table!](images/299.png)
 
+## Updating the Table to Increase the Price of a Vehicle
+You will update the data in a table using the **UPDATE** statement. Due to an increase in the cost of the rare metals needed to manufacture an electric vehicle, the 2022 Model Chi will need to undergo a price hike of 10%. The current price is $95,000.
 
+In a real-world scenario, you will update the **products** table to increase the price of this product. However, because you will use the same **sqlda** database throughout, it would be better to keep the values in the original tables unchanged so that your SQL results remain consistent. For this reason, you will create new tables for all the **INSERT, ALTER, UPDATE, DELETE,** and **DROP** statement examples.
+
+Perform the following steps to complete the exercise:
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Run the following query to create a **product_2022** table from the **products** table:
+```
+CREATE TABLE products_2022 AS (
+  SELECT *
+	FROM products
+	WHERE year=2022
+);
+```
+3. Run the following query to update the price of Model Chi by 10% in the **products_2022** table:
+```
+UPDATE products_2022 SET
+  base_msrp = base_msrp*1.10
+  WHERE model='Model Chi'
+  AND year=2022;
+```
+ 4. Write the **SELECT** query to check whether the price of Model Chi in 2022 has been updated: 
+```
+SELECT *
+FROM products_2022
+WHERE model='Model Chi'
+AND year=2022;
+```
+The following is the output of the preceding code:
+![The updated price of Model Chi in 2022!](images/model.png)
+
+As you see from the output, the price of Model Chi is now $104,500; it was previously $95,000.
+
+## Deleting Data and Tables
+You often discover that data in a table is out of date and, therefore, can no longer be used. At such times, you might need to delete data from a table.
+### Deleting Values from a Row
+Often, you might be interested in deleting a value from a row. The easiest way to accomplish this is to use the **UPDATE** structure that has already been discussed, and by setting the column value to **NULL**:
+```
+UPDATE {table_name} SET{column_1} = NULL,
+{column_2} = NULL,
+…
+{column_last} = NULL
+WHERE {conditional};
+```
+Here, **{table_name}** is the name of the table with the data that needs to be changed, **{column_1}, {column_2},… {column_last}** is the list of columns whose values you want to delete, and **{WHERE}** is a conditional statement like the one you would find in a **SELECT** query.
+
+For instance, you have the wrong email address on file for the customer with the **customer ID** equal to **3**. To fix that, you can use the following query:
+```
+UPDATE customers SET
+email = NULL
+WHERE customer_id=3;
+```
+However, there might be cases where you might need to delete rows from a table. For example, in the database, you have a row labeled **test customer**, which is no longer needed and needs to be deleted. 
+
+### Deleting Rows from a Table
+Deleting a row from a table can be done using the **DELETE** statement, which looks like this:
+```
+DELETE FROM {table_name}
+WHERE {condition};
+```
+For instance, you must delete the products whose **product_type** is **scooter** from the **products_2014** table. To do that, you can use the following query:
+```
+DELETE FROM products_2014
+WHERE product_type='scooter';
+```
+You have inserted three products into this table, all scooters. After running the **DELETE** statement, PostgreSQL shows that there was no product in this table anymore as all records are deleted.
+![DELETE statement example!](images/scooter.png)
+
+If you want to delete all the data in the **products_2014** table without deleting the table, you could write the following query, which is **DELETE** without any conditions:
+```
+DELETE FROM products_2014;
+```
+Alternatively, if you want to delete all the data in a query without deleting the table, you could use the **TRUNCATE** keyword like so:
+```
+TRUNCATE TABLE products_2014;
+```
+
+### Deleting Tables
+To delete all the data in a table and the table itself, you can just use the **DROP TABLE** statement with the following syntax:
+```
+DROP TABLE {table_name};
+```
+Here, **{table_name}** is the name of the table you want to delete. If you wanted to delete all the data in the **products_2014** table along with the table itself, you would write the following:
+```
+DROP TABLE products_2014;
+```
+If you want to read from this table, you will receive an error message from PostgreSQL telling you that the table does not exist:
+```
+DROP TABLE products_2014;
+
+SELECT * FROM products_2014;
+```
+![DROP statement example!](images/drop.png)
+
+Once the table is dropped, all aspects of this table are gone, and you cannot perform any operations on it. For example, if you try to run the **DROP TABLE products_2014** statement again, you will run into an error. A PostgreSQL enhancement of the **DROP** statement is **DROP TABLE IF EXISTS**. This statement will check the existence of the table. If the table is not in the database, PostgreSQL will skip this statement with a notification, but without reporting an error, as shown below:
+```
+DROP TABLE IF EXISTS products_2014;
+```
+![DROP TABLE IF EXISTS statement example!](images/drop1.png)
+**DROP TABLE IF EXISTS** is helpful if you want to automate SQL script execution. One common usage scenario is to use it before the **CREATE TABLE** statement. If the table already exists, your **CREATE TABLE** statement will fail and raise an error. But if your **DROP TABLE IF EXISTS**
+statement is before your **CREATE TABLE** statement, pre-existing tables would have been dropped before you tried to recreate them. This is useful in automated computing operations where you constantly create temporary tables that you do not need after the current computing job is completed.
+
+The catch is that you must make sure that the table is truly temporary and is not used by anyone else. Otherwise, you may accidentally drop tables that are used by some other users without knowing. For this reason, the **DROP TABLE IF EXISTS** statement is usually only used in environments
+designated for automated data processing.
+
+### Deleting an Unnecessary Reference Table
+you will learn how to delete a table using SQL. For instance, the marketing team has finished analyzing the potential number of customers they have in every state, and they no longer need the **state_populations** table. To save space in the database, delete the table. If you have not
+created this table, please go back to the Simple CREATE Statement and create it now.
+1. Open pgAdmin, connect to the **sqlda database**, and open **SQL query editor**.
+2. Run the following query to drop the **state_populations** table:
+```
+DROP TABLE state_populations;
+```
+3. Check that the **state_populations** table has been deleted from the database.
+4. Since the table has just been dropped, a **SELECT** query on this table throws an error, as expected:
+```
+SELECT * FROM state_populations;
+```
+You will find the error in the following figure: 
+![Error shown as the state_populations table was dropped!](images/state.png)
+
+5. Also, drop the **products_2022** table that was created above to keep the database clean:
+```
+DROP TABLE products_2022;
+```
+
+### Creating and Modifying Tables for Marketing Operations
+You did a great job of pulling data for the marketing team. However, the marketing manager, who you helped, realized that they had made a mistake. It turns out that instead of just the query, the manager needs to create a new table in the company's analytics database. Furthermore, they need to make some changes to the data that is present in the **customers table**. It is your job to help the marketing manager with the table:
+
+1. Open pgAdmin, connect to the **sqlda** database and open SQL query editor. Create a new table called **customers_nyc** that pulls all the rows from the **customers** table where the customer lives in New York City in the state of New York.
+
+```
+CREATE TABLE customers_nyc AS (
+SELECT *
+FROM customers
+WHERE city='New York City'
+AND state='NY'
+);
+```
+Run the following code to see the output:
+```
+SELECT * FROM customers_nyc;
+```
+This is the output of the code:
+![Table showing customers from New York City!](images/nyc.png)
+
+2. Delete all customers in postal code 10014 from the new table. Due to local laws, they will not be eligible for marketing.
+Run the following query statement to delete users with the postal code 10014:
+```
+DELETE FROM customers_nyc
+WHERE postal_code='10014';
+```
+
+3. Add a new text column called **event**.
+Execute the following query to add the new **event** column:
+```
+ALTER TABLE customers_nyc
+ADD COLUMN event text;
+```
+
+4. Set the value of the event column to **thank-you party**.
+Update the **customers_nyc** table and set the **event** column to **thank-you party** using the following query:
+```
+UPDATE customers_nyc SET
+event = 'thank-you party';
+```
+Run the following code to see the output:
+```
+SELECT *
+FROM customers_nyc;
+```
+The following is the output of the code:
+![The customers_nyc table with event set to thank-you party!](images/event.png)
+
+You tell the manager that you have completed these steps. He tells the marketing operations team, who then uses the data to launch a marketing campaign. The marketing manager then asks you to delete the **customers_nyc** table.
+
+Delete the **customers_nyc** table as asked by the manager using **DROP TABLE**:
+```
+DROP TABLE customers_nyc;
+```
 
 
 
