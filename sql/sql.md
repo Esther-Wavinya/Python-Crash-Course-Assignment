@@ -405,9 +405,82 @@ DROP TABLE customers_nyc;
 ```
 
 
+# SQL for Data Preparation
+In the real world, as a data analyst, you usually do not handle the entire CRUD flow. To be more specific, you usually do not create datasets from scratch. You will receive data from outside sources. This data is usually in a form that would not fit your needs perfectly and you would need to perform some transform operations to make the data usable. One such operation is the creation of clean datasets from existing raw datasets. The raw data may be missing some information, contain information that is not in the format that fits your needs, or contains information that may not be accurate.
 
+According to Forbes, it is estimated that almost 80% of the time spent by analytics professionals involves preparing data. Building models with unclean data harms analysis by leading to poor conclusions. SQL can help in this tedious but important task by providing efficient ways to build clean datasets.
 
+## Assembling Data
+### Connecting Tables using JSON
+Most of the time, the data you are interested in is spread across multiple tables. A simple **SELECT** statement over one table will not be enough to get you what you need. Fortunately, SQL has methods for bringing related tables together using the **JOIN** keyword.
 
+To illustrate, look at two tables in the **ZoomZoom** database—**dealerships** and **salespeople**.
+![Structure of dealerships table!](images/DEALERSHIP.png)
+
+And the **salespeople** table looks like this:
+![Structure of salespeople table!](images/salespeople.png)
+
+In the **salespeople** table, you can observe that there is a column called **dealership_id**. This **dealership_id** column is a direct reference to the **dealership_id** column in the **dealerships** table.
+
+When table A has a column that references the primary key of table B, the column is said to be a foreign key to table A. In this case, the **dealership_id** column in salespeople is a foreign key to the dealerships table.
+
+**Note**
+*Foreign keys can also be added as a column constraint to a table to improve the integrity of the data by making sure that the foreign key never contains a value that cannot be found in the referenced table. This data property is known as **referential integrity**. The method of adding foreign key constraints can also help to improve performance in some databases. Foreign key constraints are not used in most analytical databases and are beyond the scope of this text. You can learn more about
+foreign key constraints in the official PostgreSQL documentation.*
+
+As these two tables are related, you can perform some interesting analyses with them. 
+
+For instance, you may be interested in determining which salespeople work at a dealership in California. One way of retrieving this information is to first query which dealerships are in California. You can do this using the following query:
+```
+SELECT *
+FROM dealerships
+WHERE state='CA';
+```
+This query should give you the following results:
+![Dealerships in California!](images/ca.png)
+
+Now that you know that the only two dealerships in California have the IDs of **2** and **5**, respectively, you can then query the **salespeople** table, as follows:
+```
+SELECT *
+FROM salespeople
+WHERE dealership_id in (2, 5)
+ORDER BY 1;
+```
+The following are the first rows of the output of the code:
+![Salespeople in California!](images/sa.png)
+
+While this method gives you the results you want, it is tedious to perform two queries to get these results. What would make this process easier would be to somehow add the information from the **dealerships** table to the **salespeople** table and then filter for users in California. SQL provides such a tool with the **JOIN** clause. The **JOIN** clause is a SQL clause that allows a user to join one or more tables together based on distinct conditions.
+
+### Types of Joins
+![Major types of joins!](images/joins.png)
+
+## Inner Joins
+An inner join connects rows in different tables, based on a condition known as the **join predicate**. In many cases, the join predicate is a logical condition of equality. Each row in the first table is compared
+against every other row in the second table. For row combinations that meet the inner join predicate, that row is returned in the query. Otherwise, the row combination is discarded.
+
+Inner joins are usually wriiten in the following form:
+```
+SELECT {columns}
+FROM {table1}
+INNER JOIN {table2}
+  ON {table1}.{common_key_1}={table2}.{common_key_2};
+```
+Here, **{columns}** is the columns you want to get from the joined table, **{table1}** is the first table, **{table2}** is the second table, **{common_key_1}** is the column in **{table1}** you want to join
+on, and **{common_key_2}** is the column in **{table2}** to join on.
+
+Now, go back to the two tables discussed previously—**dealerships** and **salespeople**. As mentioned earlier, it would be good if you could append the information from the **dealerships** table to the **salespeople** table knowing which state each dealership is in. For the time being, assume that all the salespeople IDs have a valid **dealership_id** value.
+
+You can join the two tables using an equal to condition in the join predicate, as follows:
+```
+SELECT *
+FROM salespeople
+INNER JOIN dealerships
+ON salespeople.dealership_id = dealerships.dealership_id
+ORDER BY 1;
+```
+
+The following figure shows the first few rows of the output:
+![The salespeople table joined to the dealerships table!](images/id.png)
 
 
 
