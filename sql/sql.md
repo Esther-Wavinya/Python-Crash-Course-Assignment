@@ -465,8 +465,7 @@ FROM {table1}
 INNER JOIN {table2}
   ON {table1}.{common_key_1}={table2}.{common_key_2};
 ```
-Here, **{columns}** is the columns you want to get from the joined table, **{table1}** is the first table, **{table2}** is the second table, **{common_key_1}** is the column in **{table1}** you want to join
-on, and **{common_key_2}** is the column in **{table2}** to join on.
+Here, **{columns}** is the columns you want to get from the joined table, **{table1}** is the first table, **{table2}** is the second table, **{common_key_1}** is the column in **{table1}** you want to join on, and **{common_key_2}** is the column in **{table2}** to join on.
 
 Now, go back to the two tables discussed previously—**dealerships** and **salespeople**. As mentioned earlier, it would be good if you could append the information from the **dealerships** table to the **salespeople** table knowing which state each dealership is in. For the time being, assume that all the salespeople IDs have a valid **dealership_id** value.
 
@@ -481,6 +480,173 @@ ORDER BY 1;
 
 The following figure shows the first few rows of the output:
 ![The salespeople table joined to the dealerships table!](images/id.png)
+
+As you can see in the preceding output, the table is the result of joining the **salespeople** table to the **dealerships** table. Note that the first table listed in the query, **salespeople**, is on the left-
+hand side of the result, while the **dealerships** table is on the right-hand side. 
+
+This left-right order will become very important when you learn about outer joins between tables. During an outer join, whether a table is on the left or right side can impact the output of the query. For an inner join, however, the order of tables is not important for join predicates that use an equal operation.
+
+Now, look at the columns involved; **dealership_id** in the **salespeople** table matches **dealership_id** in the **dealerships** table. This shows how the join predicate is met. By
+running this **join** query, you have effectively created a new "super dataset" consisting of the two tables merged where the two **dealership_id** columns are equal.
+
+You can now run a **SELECT** query over this "super dataset" in the same way as one large table using the clauses and keywords from before.
+
+For example, going back to the multi-query issue to determine which sales query works in California, you can now address it with one easy query:
+```
+SELECT *
+FROM salespeople
+INNER JOIN dealerships
+ON salespeople.dealership_id = dealerships.dealership_idWHERE dealerships.state = 'CA'
+ORDER BY 1;
+```
+This gives you the following output, which displays the first few rows of the entire result set:
+![Salespeople in California with one query!](images/ca%20rep.png)
+
+If you want to retrieve only the **salespeople** table portion of this, you can select the **salespeople** columns using the following star syntax
+```
+SELECT salespeople.*
+FROM salespeople
+INNER JOIN dealerships
+  ON dealerships.dealership_id = salespeople.dealership_id
+WHERE dealerships.state = 'CA'
+ORDER BY 1;
+```
+Here are the first few rows returned by this query:
+![Salespeople in California with SELECT table alias!](images/sel.png)
+
+There is another shortcut that can help while writing statements with several **JOIN** clauses. You can alias table names to avoid typing the entire name of the table every time. Simply write the name of the alias after the first mention of the table after the **JOIN** clause, and you can save a decent amount of typing. 
+
+For instance, for the preceding query, if you wanted to alias salespeople with s and dealerships with d, you could write the following statement:
+```
+SELECT s.*
+FROM salespeople s
+INNER JOIN dealerships d
+  ON d.dealership_id = s.dealership_id
+WHERE d.state = 'CA'
+ORDER BY 1;
+```
+Alternatively, you could also put the **AS** keyword between the table name and alias to make the alias more explicit:
+```
+SELECT s.*
+FROM salespeople AS s
+INNER JOIN dealerships AS d
+ON d.dealership_id = s.dealership_id
+WHERE d.state = 'CA'
+ORDER BY 1;
+```
+
+
+## Outer Joins
+Inner joins will only return rows from the two tables when the join predicate is met for both tables, that is, when both tables have rows that can satisfy the join predicate. Otherwise, no rows from either table are returned. 
+
+It can happen that sometimes you want to return all rows from one of the tables, even if the other table does not have any row meeting the join predicate. In this case, since there is no row meeting the join predicate, the second table will return nothing but **NULL**. Outer join is a join type in which all rows from at least one table, if meeting the query **WHERE** condition, will be presented after the **JOIN** operation.
+
+Outer joins can be classified into three categories: left outer joins, right outer joins, and full outer joins:
+
+- Left outer join: **Left outer joins** are where the left table (that is, the table mentioned first in a join clause) will have every row returned. If a row from the other table (the right table) is not
+found, a row of **NULL** is returned from the right table. Left outer joins are performed by using the **LEFT OUTER JOIN** keywords, followed by a join predicate. This can also be written in short as **LEFT JOIN**.
+
+
+To show how left outer joins work, examine two tables: the **customers** table and the **emails table**. For the time being, assume that not every customer has been sent an email, and you want to mail all customers who have not received an email. You can use a left outer join to make that happen since the left side of the join is the **customers** table. To help manage the output, you will limit it to the first 1,000 rows. The following code snippet is utilized:
+```
+SELECT
+ *
+FROM
+  customers c
+LEFT OUTER JOIN
+  emails e ON e.customer_id=c.customer_id
+ORDER BY
+  c.customer_id
+LIMIT 1000;
+```
+The following is the output of the preceding code:
+![Customers left-joined to emails!](images/leftjoin.png)
+
+When you look at the output of the query, you should see that entries from the **customers** table are present. However, for some of the rows, such as for **customer_id 27**, which can be seen above, the columns belonging to the **emails** table are completely full of **NULL** values. This arrangement explains how the outer join is different from the inner join. 
+
+If the inner join was used, the **customer_id 27** row would not show because there is no matching record in the emails table.
+
+This query, however, is still useful because you can now use it to find people who have never received an email. Because those customers who were never sent an email have a null **customer_id** column in the values returned from **emails** table, you can find all these customers by checking the **customer_id** column in the **emails** table, as follows:
+```
+SELECT
+   c.customer_id,
+   c.title,
+   c.first_name,
+   c.last_name,
+   c.suffix,
+   c.email,e.email_id,
+   e.email_subject,
+   e.opened,
+   e.clicked,
+   e.bounced,
+   e.sent_date,
+   e.opened_date,
+   e.clicked_date
+FROM
+  customers c
+LEFT OUTER JOIN
+  emails e ON c.customer_id = e.customer_id
+WHERE
+  e.customer_id IS NULL
+ORDER BY
+  c.customer_id
+LIMIT
+  1000;
+```
+The following is the output of the query:
+![Customers with no emails sent!](images/mail.png)
+
+As you can see, all entries are blank in the **email_id** column of the **emails** table, indicating that the customer of that row has not received any emails. You could simply grab the emails from this join to get all the customers who have not received an email.
+
+- Right outer join: A **right outer join** is very similar to a left join, except the table on the "right" (the second listed table) will now have every row show up, and the "left" table will have **NULL** values if the **JOIN** condition is not met. To illustrate, let's "flip" the last query by right-joining the **emails** table to the **customers** table with the following query:
+```
+SELECT
+  e.email_id,
+  e.email_subject,
+  e.opened,
+  e.clicked,
+  e.bounced,
+  e.sent_date,
+  e.opened_date,
+  e.clicked_date,
+  c.customer_id,c.title,
+  c.first_name,
+  c.last_name,
+  c.suffix,
+  c.email
+FROM emails e
+RIGHT OUTER JOIN customers c
+  ON e.customer_id=c.customer_id
+ORDER BY
+  c.customer_id
+LIMIT
+  1000;
+```
+When you run this query, you will get something similar to the following result:
+![Emails right-joined to the customers table!](images/rightjoin.png)
+
+Notice that this output is similar to what was produced above, except that the data from the **emails** table is now on the left-hand side, and the data from the **customers** table is on the right-hand side. Once again, **customer_id 27** has **NULL** for the email. This shows the symmetry between a right join and a left join.
+
+- Full outer join: Finally, there is the ***full outer join**. The full outer join will return all rows from the left and right tables, regardless of whether the join predicate is matched. For rows where the
+join predicate is met, the two rows are combined just like in an inner join. For rows where it is not met, each row from both tables will be selected as an individual row, with **NULL** filled in for the columns from the other table. The full outer join is invoked by using the **FULL OUTER JOIN** clause, followed by a join predicate. Here is the syntax of this join:
+```
+SELECT
+*
+FROM
+  emails e
+FULL OUTER JOIN
+  customers c
+  ON e.customer_id=c.customer_id;
+```
+The following is the output of the code:
+![Emails are full outer joined to the customers table!](images/fulloutrt.png)
+
+## Cross Joins
+
+
+
+
+
 
 
 
