@@ -1,7 +1,7 @@
 
 ## Querying the salespeople Table Using Basic Keywords in a SELECT Query
 
-In this exercise, you will create various queries using basic keywords in a **SELECT** query. For instance, after a few days at your new job, you finally get access to the company database. Your boss has asked you to help a sales manager who does not know SQL particularly well. The sales manager
+You will create various queries using basic keywords in a **SELECT** query. For instance, after a few days at your new job, you finally get access to the company database. Your boss has asked you to help a sales manager who does not know SQL particularly well. The sales manager
 would like a couple of different lists of salespeople.
 
 
