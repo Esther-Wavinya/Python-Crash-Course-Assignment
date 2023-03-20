@@ -659,6 +659,207 @@ CROSS JOIN
 The output of this query is as follows:
 ![The cross join of a product to itself!](images/CR.png)
 
+In this case, you have joined every value of every field in one table to the same in another table. The result of the query has 144 rows, which is the equivalent of multiplying the 12 products by the same 12 products (12 * 12). You can also see that cross join does not require a join predicate. In other words, a cross join can simply be thought of as just an outer join with no conditions for joining.
+
+In general, cross joins are not used much in practice as they can hamper the process if you are not careful. Cross joining two large tables can lead to the origination of hundreds of billions of rows, which can stall and crash a database. So, if you decide to use a cross join, ensure you take utmost care when using it.
+
+
+## Using Joins to Analyze Sales Dealership
+You will use joins to bring related tables together. For instance, the head of sales at your company would like a list of all customers who bought a car. To do the task, you need to create a query that will return all customer IDs, first names, last names, and valid phone numbers of customers who purchased a car.
+
+
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Use an inner join to bring the **sales**, **customers**, and **products** tables together, which returns data for customer IDs, first names, last names, and valid phone numbers:
+```
+SELECT
+  c.customer_id, c.first_name,
+  c.last_name, c.phone
+FROM
+  sales s
+INNER JOIN
+  customers c ON c.customer_id=s.customer_id
+INNER JOIN
+  products p ON p.product_id=s.product_id
+WHERE
+  p.product_type='automobile'
+  AND c.phone IS NOT NULL;
+```
+You should get an output similar to the following:
+![Customers who bought a car!](images/CAR.png)
+
+You can see that running the query helped you to join the data from the **sales**, **customers**, and **products** tables and obtain a list of customers who bought a car and have a phone number.
+
+You were able to bring together related tables easily and efficiently.
+Several times, you will also want to combine the result of your queries to form new queries so that you can build data analysis on top of existing analysis.
+
+## Subqueries
+So far, you have been pulling data from tables. You may have observed that the results of all **SELECT** queries are two-dimensional relations that look like the tables in a relational database. Knowing this,
+you may wonder whether there is some way to use the relations produced by the **SELECT** queries instead of referencing an existing table in your database. The answer is "yes." You can simply take a query, insert it between a pair of parentheses, and give it an alias. This will help you to build an analysis on top of existing analysis, thus reducing errors and improving efficiency.
+
+For example, if you wanted to find all the salespeople working in California and get the results the same as ![above!](https://github.com/Esther-Wavinya/Python-Crash-Course-Assignment/blob/main/sql/images/ca%20rep.png), you could write the query using the following alternative:
+```
+SELECT
+  *
+FROM
+  salespeople
+INNER JOIN (
+  SELECT
+   *
+FROM
+    dealerships
+WHERE
+    dealerships.state = 'CA'
+) d
+ON d.dealership_id = salespeople.dealership_id
+ORDER BY
+  1;
+```
+
+Here, instead of joining the two tables and filtering for rows with the state equal to **'CA'**, you first find the dealerships where the state equals **'CA'**, and then inner join the rows in that query to
+**salespeople**.
+
+If a query only has one column, you can use a subquery with the **IN** keyword in a **WHERE** clause. For example, another way to extract the details from the **salespeople** table using the dealership ID for
+the state of California would be as follows:
+```
+SELECT
+  *
+FROM
+  salespeople
+WHERE dealership_id IN (
+  SELECT dealership_id FROM dealerships
+  WHERE dealerships.state = 'CA'
+)
+ORDER BY
+  1;
+```
+As illustrated in all of these examples, it is quite easy to write the same query using multiple techniques.
+
+
+# Unions
+You have learned how to join data horizontally. You can use joins to add
+new columns horizontally. However, you may be interested in putting multiple queries together vertically, that is, by keeping the same number of columns but adding multiple rows. Please see this example for more clarity on this.
+
+Suppose you wanted to visualize the addresses of dealerships and customers using Google Maps. To do this, you would need the addresses of both customers and dealerships. You could build a query with all customer addresses as follows:
+```
+SELECT
+  street_address, city, state, postal_code
+FROM
+  customers
+WHERE
+  street_address IS NOT NULL;
+```
+
+You could also retrieve dealership addresses with the following query:
+```
+SELECT
+  street_address, city, state, postal_code
+FROM
+  dealerships
+WHERE
+  street_address IS NOT NULL;
+```
+
+To reduce complexity, it would be nice if there were a way to assemble the two queries into one list with a single query. This is where the **UNION** keyword comes into play. You can use the two previous
+queries and create the following query:
+```
+(
+SELECT
+  street_address, city, state, postal_code
+FROM
+  customers
+WHERE
+  street_address IS NOT NULL
+)
+UNION
+(
+SELECT
+  street_address, city, state, postal_code
+FROM
+  dealerships
+WHERE
+  street_address IS NOT NULL
+)
+ORDER BY
+  1;
+```  
+
+This produces the following output:
+![Union of addresses!](images/un.png)
+
+Please note that there are certain conditions that need to be kept in mind when using **UNION**. 
+
+Firstly, **UNION** requires the subqueries to have the same number of columns and the same data types for the columns. If they do not, the query will fail to run. 
+
+Secondly, **UNION** technically may not return all the rows from its subqueries. 
+
+**UNION**, by default, removes all duplicate rows in the output. If you want to retain the duplicate rows, it is preferable to use the **UNION ALL** keyword.
+
+For example, if both of the previous queries return a row with address values such as '123 Main St', 'Madison', 'WI', '53710', the result of the **UNION** statement will only contain one record for this value set, but the result of the **UNION ALL** statement will include two records of the same value, one from each query.
+
+### Generating an Elite Customer Party Guest List Using UNION
+You will assemble two queries using **UNION**. 
+
+To help build marketing awareness for the new **Model Chi**, the marketing team would like to throw a party for some of ZoomZoom's 
+wealthiest customers in Los Angeles, CA. To help facilitate the party, they would like you to make a guest list with ZoomZoom customers who live in Los Angeles, CA, as well as salespeople who work at the ZoomZoom dealership in Los Angeles, CA. The guest list should include details such as the first and last names and whether the guest is a customer or an employee.
+
+1. Open **pgAdmin**, connect to the **sqlda** database, and open the SQL query editor.
+
+Write a query that will make a list of ZoomZoom customers and company employees who live in Los Angeles, CA. The guest list should contain first and last names and whether the guest is a customer or an employee:
+```
+(
+SELECT
+  first_name, last_name, 'Customer' as guest_type
+FROM
+  customers
+WHERE
+  city='Los Angeles'
+  AND state='CA'
+)
+UNION
+(
+SELECT
+  first_name, last_name,
+  'Employee' as guest_type
+FROM
+  salespeople s
+INNER JOIN
+  dealerships d ON d.dealership_id=s.dealership_id
+WHERE
+  d.city='Los Angeles'
+  AND d.state='CA'
+);
+```
+You should get the following output:
+![Customer and employee guest list in Los Angeles, CA!](images/li.png)
+
+You can see the guest list of customers and employees from Los Angeles, CA, after running the **UNION** query.
+
+2. To demonstrate the usage of **UNION ALL**, first run a simple query that combines the **products** table with all the rows:
+```
+SELECT * FROM products
+UNION
+SELECT * FROM products
+ORDER BY 1;
+```
+![the query returns 12 rows and there are no duplicated rows!](images/rows.jpg)
+
+You can see that the query returns 12 rows and there are no duplicated rows, just the same as the original **products** table. However, say you run the following query:
+```
+SELECT * FROM products
+UNION ALL
+SELECT * FROM products
+ORDER BY 1;
+```
+![24 rows!](images/24.jpg)
+
+You will see that the query returns 24 rows, in which each row is repeated twice. This is because the **UNION ALL** statement keeps the duplicated rows from both **products** tables.
+
+
+
+
+
+
+
 
 
 
