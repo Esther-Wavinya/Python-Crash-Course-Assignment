@@ -855,6 +855,25 @@ ORDER BY 1;
 You will see that the query returns 24 rows, in which each row is repeated twice. This is because the **UNION ALL** statement keeps the duplicated rows from both **products** tables.
 
 
+# Common Table Expressions
+CTEs are simply a different version of subqueries. CTEs establish temporary tables by using the **WITH** clause. To understand this clause better, look at the following query, which you used before to find
+California-based salespeople:
+```
+SELECT
+  *
+FROM
+  salespeople
+INNER JOIN (
+  SELECT
+    *
+FROM
+   dealerships
+WHERE
+   dealerships.state = 'CA'
+) d
+ON d.dealership_id = salespeople.dealership_id
+ORDER BY
+   1;
 
 
 
