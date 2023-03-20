@@ -874,6 +874,392 @@ WHERE
 ON d.dealership_id = salespeople.dealership_id
 ORDER BY
    1;
+```
+This could be written using CTEs, as follows:
+```
+WITH d as (
+  SELECT
+    *
+  FROM
+    dealerships
+  WHERE
+    dealerships.state = 'CA'
+)
+SELECT
+  *
+FROM
+  salespeople
+INNER JOIN
+  d ON d.dealership_id = salespeople.dealership_id
+ORDER BY
+  1;
+```   
+
+The one advantage of CTEs is that they can be designed to be recursive. **Recursive CTEs** can reference themselves. Because of this feature, you can use them to solve problems that other queries cannot. However, recursive CTEs are beyond the scope of this text.
+
+
+Now that you know several ways to join data across a database, look at how to transform the data from these outputs.
+
+
+# Cleaning Data
+Often, the raw data presented in a query output may not be in the desired form. You may want to remove values, substitute values, or map values to other values. To accomplish these tasks, SQL provides a wide variety of statements and functions. 
+
+**Functions** are keywords that take in inputs (such as a column or a scalar value) and process those inputs into some sort of output. You will learn about some useful functions for data transformation and cleaning in the following text.
+
+## The CASE WHEN Function
+**CASE WHEN** is a function that allows a query to map various values in a column to other values. The general format of a **CASE WHEN** statement is as follows:
+```
+CASE
+   WHEN condition1 THEN value1
+   WHEN condition2 THEN value2
+   …
+   WHEN conditionX THEN valueX
+   ELSE else_value
+END;
+```
+Here, **condition1** and **condition2**, through **conditionX**, are **Boolean** conditions; **value1** and **value2**, through **valueX**, are values to map to the Boolean conditions; and **else_value** is the value that is mapped if none of the Boolean conditions is met. 
+
+For each row, the program starts at the top of the **CASE WHEN** statement and evaluates the first Boolean condition. The program then
+runs through each Boolean condition from the first one. For the first condition from the start of the statement that evaluates as **True**, the statement will return the value associated with that condition. If
+none of the statements evaluates as **True**, then the value associated with the **ELSE** statement will be returned.
+
+For example, you want to return all rows for **customers** from the **customers** table. Additionally, you would like to add a column that labels a user as being an **Elite Customer** type if they live in
+postal code **33111**, or as a **Premium Customer** type if they live in postal code **33124**. Otherwise, it will mark the customer as a **Standard Customer** type. This column will be called
+**customer_type**. You can create this table by using a **CASE WHEN** statement, as follows:
+```
+SELECT
+ CASE
+   WHEN postal_code='33111' THEN 'Elite Customer'
+   WHEN postal_code='33124' THEN 'Premium Customer'
+   ELSE 'Standard Customer'
+ END AS customer_type,
+ *
+FROM customers;
+```
+This query should give the following output:
+![The customer_type query!](images/query.png)
+
+As you can see in the preceding table, there is a column called **customer_type** indicating the type of customer a user is. The **CASE WHEN** statement effectively mapped a postal code to a string
+describing the customer type. Using a **CASE WHEN** statement, you can map values in any way you please.
+
+## Using the CASE WHEN Function to Get Regional Lists
+The aim of this exercise is to create a query that will map various values in a column to other values. 
+
+For instance, the head of sales has an idea to try and create specialized regional sales teams that will be able to sell scooters to customers in specific regions, as opposed to generic sales teams. To make their idea a reality, the head of sales would like a list of all customers mapped to regions. For customers from the states of MA, NH, VT, ME, CT, or RI, they would like them labeled as New England. Customers from the states of GA, FL, MS, AL, LA, KY, VA, NC, SC, TN, VI, WV, or AR,they would like the customers labeled as Southeast. Customers from any other state should be
+labeled as Other.
+
+1. Open **pgAdmin**, connect to the **sqlda** database, and open the SQL query editor.
+2. Create a query that will produce a **customer_id** column and a column called **region**, with the states categorized as in the following scenario:
+```
+SELECT
+  c.customer_id,
+  CASE
+    WHEN c.state in (
+'MA', 'NH', 'VT', 'ME', 'CT', 'RI') THEN 'New England'
+    WHEN c.state in (
+'GA', 'FL', 'MS', 'AL', 'LA', 'KY', 'VA', 'NC', 'SC', 'TN', 'VI',
+'WV', 'AR') THEN 'Southeast'
+ELSE 'Other'
+   END as region
+FROM
+   customers c
+ORDER BY
+   1;
+```
+This query will map a state to one of the regions based on whether the state is in the **CASE WHEN** condition listed for that line. You should get the following output:
+![The regional query output!](images/REGIONAL.png)
+In the preceding output, in the case of each customer, a region has been mapped based on the state where the customer resides.
+
+In this exercise, you learned how to map various values in a column to other values using the **CASE WHEN** function. In the next section, you will learn about a useful function, **COALESCE**, which will
+help to replace the **NULL** values.
+
+## The COALESCE Function
+Another common requirement is to replace the **NULL** values with a standard value. This can be accomplished easily by means of the **COALESCE** function. 
+
+**COALESCE** allows you to list any number of columns and scalar values, and, if the first value in the list is **NULL**, it will try to fill it in with the second value. The **COALESCE** function will keep continuing down the list of values until it hits a non-**NULL** value. If all values in the **COALESCE** function are **NULL**, then the function returns **NULL**.
+
+To illustrate a simple usage of the **COALESCE** function, study the **customers** table. Some of the records do not have the value of the **phone** field populated:
+```
+SELECT *
+FROM customers;
+```
+![The COALESCE query!](images/phone.png)
+
+For instance, the marketing team would like a list of the first names, last names, and phone numbers of all customers for a survey. However, for customers with no phone number, they would like the table to
+instead write the value **NO PHONE**. You can accomplish this request with **COALESCE**:
+```
+SELECT
+   first_name, last_name,
+   COALESCE(phone, 'NO PHONE') as phone
+FROM
+   customers
+ORDER BY 1;
+```
+This query produces the following results:
+![The COALESCE query!](images/coalesce.png)
+
+When dealing with creating default values and avoiding **NULL**, **COALESCE** will always be helpful.
+
+## The NULLIF Function
+**NULLIF** is used as the opposite of **COALESCE**. While **COALESCE** is used to convert **NULL** into a standard value, **NULLIF** is a two-value function and will return **NULL** if the first value equals the
+second value.
+
+For example, the marketing department has created a new direct mail piece to send to the customer. One of the quirks of this new piece of advertising is that it cannot accept people who have titles (Mr,
+Dr, Mrs, and so on) longer than three letters. However, some records may have a title that is longer than three letters. If the system cannot accept them, they should be removed during the retrieval of results.
+
+In the sample database, the only known title longer than three characters is **Honorable**. Therefore, they would like you to create a mailing list that is just all the rows with valid street addresses and to
+block out all titles with **NULL** that are spelled as **Honorable**. This could be done with the following query:
+```
+SELECT customer_id,
+     NULLIF(title, 'Honorable') as title,
+     first_name,
+     last_name,
+     suffix,email,
+     gender,
+     ip_address,
+     phone,
+     street_address,
+     city,
+     state,
+     postal_code,
+     latitude,
+     longitude,
+     date_added
+FROM
+     customers c
+ORDER BY 1;
+```
+
+This will remove all mentions of **Honorable** from the **title** column.
+![The NULLIF query!](images/nullify.png)
+
+## The LEAST/GREATEST Functions
+Two functions that come in handy for data preparation are the **LEAST** and **GREATEST** functions. Each function takes any number of values and returns the least or the greatest of the values, respectively. 
+
+For example, if you use the **LEAST** function with two parameters, such as 600 and 900, 600 will be returned as the value. It is the opposite of what the GREATEST function will return. The parameters can either be literal values or the values stored inside numeric fields.
+
+The simple use of this variable would be to replace the value if it is too high or low. You can study an example closely to understand it better. For instance, the sales team may want to create a sales list
+where every scooter is $600 or less. You can create this using the following query:
+```
+SELECT
+    product_id, model,
+    year, product_type,
+    LEAST(600.00, base_msrp) as base_msrp,
+    production_start_date,
+    production_end_date
+FROM
+    products
+WHERE
+    product_type='scooter'
+ORDER BY 1;
+```
+This query should give the following output:
+![Cheaper scooters!](images/sco.png)
+
+From the output, you can see that if **base_msrp** was lower than **600**, the SQL query will return the original **base_msrp**. But if **base_msrp** is higher than **600**, you will get **600** back. It is the lower value of **base_msrp** and **600** that the query returns, which is what the **LEAST()** function is supposed to do.
+
+
+
+## The Casting Function
+Another useful data transformation is to change the data type of a column within a query. This is usually done to use a function only available to one data type, such as text, while working with a
+column that is in a different data type, such as numeric. To change the data type of a column, you simply need to use the **column::datatype** format, where column is the **column** name and **datatype** is the **datatype** you want to change the column to.
+
+For example, to change the year in the **products** table to a text column in a query, use the following query:
+```
+SELECT
+   product_id,
+   model,
+   year::TEXT,
+   product_type,
+   base_msrp,
+   production_start_date,
+   production_end_date
+FROM
+   products;
+```
+This query produces the following output:
+![The year column as text!](images/year.png)
+
+This will convert the **year** column to text. You can now apply text functions to this transformed column. Please note that not every data type can be cast to a specific data type. For instance,**datetime** cannot be cast to float types. Your SQL client will throw an error if you ever make an unexpected conversion.
+
+
+# Transforming Data
+Each dataset is unique along with each of the business use cases for the datasets. That means the processing and transforming of datasets are unique in their own way. However, there are some processing logics that you will frequently run into in the real world. 
+
+## The DISTINCT AND DISTINCT ON Functions
+When looking through a dataset, you may be interested in determining the unique values in a column or group of columns. This is the primary use case of the **DISTINCT** keyword.
+
+For example, if you wanted to know all the unique model years in the **products** table, you could use the following query:
+```
+SELECT DISTINCT year
+FROM products
+ORDER BY 1;
+```
+This should give the following result:
+![Distinct model years!](images/distinct.png)
+
+You can also use it with multiple columns to get all the distinct column combinations present. For example, to find all distinct years and what product types were released for those model years, you can simply use the following:
+```
+SELECT DISTINCT year, product_type
+FROM products
+ORDER BY 1, 2;
+```
+This should give the following output:
+![Distinct model years and product types!](images/mod.png)
+
+Another keyword related to **DISTINCT** is **DISTINCT ON**. Now, **DISTINCT ON** allows you to ensure that only one row is returned, and one or more columns are always unique in the set. The general syntax of a **DISTINCT ON** query is as follows:
+```
+SELECT DISTINCT ON (distinct_column)
+column_1,
+column_2,
+…
+column_n
+FROM table
+ORDER BY order_column;
+```
+Here, **distinct_column** is the column(s) you want to be distinct in your query, **column_1** through **column_n** are the columns you want in the query, and **order_column** allows you to determine the first row that will be returned for a **DISTINCT ON** query if multiple columns have the same value for **distinct_column**.
+
+For **order_column**, the first column mentioned should be **distinct_column**. If an **ORDER BY** clause is not specified, the first row will be decided randomly.
+
+For example, you want to get a unique list of **salespeople** where each salesperson has a unique first name. In the case that two salespeople have the same first name, you will return the one that joined the company earlier. This query would look as follows:
+```
+SELECT DISTINCT ON (first_name)
+   *
+FROM
+   salespeople
+ORDER BY
+   first_name, hire_date;
+```
+It should return this output:
+![DISTINCT ON first_name!](images/dist.png)
+This table now guarantees that every row has a distinct username. If there are multiple users with the same first name, then the user who was hired first by the company will be pulled by the query.
+
+For example, if the **salespeople** table has multiple rows with the first name **Abby**, the row in the above Figure with the name of Abby (that is, the first row in the outputs) is for the first person employed at the company with the name Abby.
+
+Likewise, when you have two employees with the same first name, the query results will order them by the start date. For example, when two
+employees, Andrey Haack with the start date of 2016-01-10 and Andrey Kures with the start date of 2016-05-17, exist in the database, Andrey Haack will be listed first, since his start date is earlier.
+
+## Building a Sales Model using SQL Techniques
+You will clean and prepare the data for analysis using SQL techniques. 
+
+The data science team wants to build a new model to help predict which customers are the best prospects for remarketing. A new data scientist has joined their team. It is your responsibility to help the new data
+scientist prepare and build a dataset to be used to train a model. Write a query to assemble a dataset. 
+Here are the steps to perform:
+1. Open **pgAdmin**, connect to the **sqlda database**, and open the SQL query editor.
+2. Use **INNER JOIN** to join the **customers** table to the **sales** table.
+```
+SELECT *
+FROM sales s
+JOIN customers c
+ON s.customer_id = c.customer_id
+```
+
+3. Use **INNER JOIN** to join the **products** table to the **sales** table.
+```
+FROM sales s
+JOIN customers c
+ON s.customer_id = c.customer_id
+JOIN products p
+ON s.product_id = p.product_id
+```
+
+4. Use **LEFT JOIN** to join the **dealerships** table (right table) to the **sales** table (left table).
+```
+FROM sales s
+LEFT JOIN dealerships d
+ON d.dealership_id = s.dealership_id
+JOIN customers c
+ON s.customer_id = c.customer_id
+JOIN products pON s.product_id = p.product_id
+```
+
+5. Return all columns of the **customers** table and the **products** table.
+```
+SELECT
+c.*, p.*
+FROM sales s
+LEFT JOIN dealerships d
+ON d.dealership_id = s.dealership_id
+JOIN customers c
+ON s.customer_id = c.customer_id
+JOIN products p
+ON s.product_id = p.product_id;
+```
+
+
+6. Return the **dealership_id** column from the **sales** table, but fill in **dealership_id** in **sales** with **-1** if it is **NULL**.
+```
+SELECT
+COALESCE(s.dealership_id, -1) sales_dealership,
+c.*, p.*
+FROM sales s
+LEFT JOIN dealerships d
+ON d.dealership_id = s.dealership_id
+JOIN customers c
+ON s.customer_id = c.customer_id
+JOIN products p
+ON s.product_id = p.product_id;
+```
+
+7. Add a column called **high_savings** that returns **1** if the sales amount was **500** less than **base_msrp** or lower. Otherwise, it returns **0**. Please make sure that you perform the query on a joined table.
+```
+SELECT
+COALESCE(s.dealership_id, -1) sales_dealership,
+CASE
+WHEN sales_amount < base_msrp - 500 THEN 1
+ELSE 0
+END high_savings,c.*, p.*
+FROM sales s
+LEFT JOIN dealerships d
+ON d.dealership_id = s.dealership_id
+JOIN customers c
+ON s.customer_id = c.customer_id
+JOIN products p
+ON s.product_id = p.product_id;
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
