@@ -1351,7 +1351,162 @@ FROM
    customers;
 ```
 ### Using Aggregate Functions to Analyze Data
+You will analyze and calculate the price of a product using different aggregate functions. For instance, say you are curious about the data at your company and interested in understanding some of the basic statistics around ZoomZoom product prices. Now, you want to calculate the lowest price, highest price, average price, and standard deviation of the price for all the products the company has ever sold.
 
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Calculate the lowest price, highest price, average price, and standard deviation of the price using the **MIN, MAX, AVG**, and **STDDEV** aggregate functions, respectively, from the **products** table:
+```
+SELECT
+   MIN(base_msrp),
+   MAX(base_msrp),
+   AVG(base_msrp),
+   STDDEV(base_msrp)
+FROM
+   products;
+```
+The preceding code will produce an output similar to this:
+![Statistics of the product price!](images/avg.png)
+
+From the preceding output, you can see that the minimum price is **349.99**, the maximum price is **115000.00**, the average price is **33358**.32750, and the standard deviation of the price is **44484.40866.**
+
+
+
+### Aggregate Functions with the GROUP BY Clause
+So far, you have used aggregate functions to calculate statistics for an entire column. However, most times you are interested in not only the aggregate values for a whole table but also the values for smaller groups in the table. To illustrate this, refer back to the **customers** table. You know that the total number of customers is 50,000. However, you might want to know how many customers there are in each state. But how can you calculate this?
+
+You could determine how many states there are with the following query:
+```
+SELECT DISTINCT
+   state
+FROM
+   customers;
+```
+You will see 50 distinct states, Washington D.C., and **NULL** returned as a result of the preceding query, totaling 52 rows. Once you have the list of states, you could then run the following query for each state:
+```
+SELECT
+   COUNT(*)
+FROM
+   customers
+WHERE
+   state='{state}'
+```
+Although you can do this, it is incredibly tedious and can take a long time if there are many states. The **GROUP BY** clause provides a much more efficient solution.
+
+## The GROUP BY Clause
+**GROUP BY** is a clause that divides the rows of a dataset into multiple groups based on some sort of key that is specified in the clause. An aggregate function is then applied to all the rows within a single group to produce a single number for that group. The **GROUP BY** key and the aggregate value for the group are then displayed in the SQL output. The following diagram illustrates this general process:
+![General GROUP BY computational model!](images/GROUP%20BY.png)
+
+In the preceding diagram, you can see that the dataset has multiple groups **(Group 1, Group 2, …, Group N)**. Here, the aggregate function is applied to all the rows in **Group 1** and generates the
+result **Aggregate 1**. Then, the aggregate function is applied to all the rows in **Group 2** and generates the result **Aggregate 2**, and so on.
+
+The **GROUP BY** statements usually have the following structure:
+```
+SELECT
+   {KEY},
+   {AGGFUNC(column1)}
+FROM
+   {table1}
+GROUP BY
+   {KEY}
+```
+Here, **{KEY}** is a column or a function on a column that is used to create individual groups. For each value of **{KEY}**, a group is created. **{AGGFUNC(column1)}** is an aggregate function on a column that is calculated for all the rows within each group. **{table}** is the table or set of joined tables from which rows are separated into groups.
+
+To illustrate this point, you can count the number of customers in each US state using a **GROUP BY** query:
+```
+SELECT
+   state, COUNT(*)
+FROM
+   customers
+GROUP BY
+   state;
+```
+The computational model looks like this:
+![Customer count by the state computational model!](images/custo.png)
+Here, **AK, AL, AR,** and the other keys are abbreviations for US states. This grouping is a two-step process. In the first step, SQL will create groups based on the existing states, one group for each state,
+labeling the group with the state. SQL then will allocate customers into different groups based on their states. Once all the customers are allocated to their respective state groups, the execution goes into the
+second step. In this step, SQL will apply the aggregate function to each group and associate the result with the group label, which is **state** in this case. The output of the SQL will be a set of aggregate function results with its state label. You should get the following output, in which **state** is the label and **count** is the aggregate result:
+![Customer count by the state query output!](images/stat.png)
+
+The **{KEY}** value for the **GROUP BY** operation can also be a function of column(s). The underlying example counts customers based on the year they were added to the database. Here, the year was the result of the **TO_CHAR** function on the **date_added** column:
+```
+SELECT
+  TO_CHAR(date_added, 'YYYY'),
+  COUNT(*)
+FROM
+  customers
+GROUP BY
+  TO_CHAR(date_added, 'YYYY')
+ORDER BY 1;
+```
+The result of this SQL is as follows:
+![Customer count GROUP BY function!](images/tochar.png)
+
+You can also use the column number to perform a **GROUP BY** operation:
+```
+SELECT
+   state,
+   COUNT(*)
+FROM
+   customers
+GROUP BY 1;
+```
+This SQL will return the same result as the previous one, which used the column name in the **GROUP BY** clause.
+
+If you want to return the output in alphabetical order, simply use the following query:
+```
+SELECT
+  state,
+  COUNT(*)
+FROM
+  customers
+GROUP BY
+  state
+ORDER BY
+  state;
+```
+Alternatively, you can write the following with the column order number in **GROUP BY** and **ORDER BY** instead of column names:
+```
+SELECT
+   state,
+   COUNT(*)
+FROM
+   customers
+GROUP BY
+   1
+ORDER BY 1;
+```
+Either of these queries will give you the following result:
+![Customer count by the state query output in alphabetical order!](images/outp.png)
+
+Often, though, you may be interested in ordering the aggregates themselves. You may want to know the number of customers in each state in increasing order so that you know which state has the least number of customers. You can then use this result to make a business decision, such as launching a new marketing campaign in the states where you don't have enough presence. This would require you to order the aggregates themselves. The aggregates can also be ordered using **ORDER BY**, as follows:
+```
+SELECT
+   state,
+   COUNT(*)
+FROM
+   customers
+GROUP BY
+   state
+ORDER BY
+   COUNT(*);
+```
+This query gives you the following output:
+![Customer count by the state query output in increasing order!](images/order.png)
+
+You may also want to count only a subset of the data, such as the total number of male customers in a particular state. To calculate the total number of male customers, you can use the following query:
+```
+SELECT
+   state, COUNT(*)
+FROM
+   customers
+WHERE
+   gender='M'
+GROUP BY
+   state
+ORDER BY
+   State;
+```
+This gives you the following output:
 
 
 
