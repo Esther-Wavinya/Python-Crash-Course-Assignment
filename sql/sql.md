@@ -1218,14 +1218,139 @@ JOIN products p
 ON s.product_id = p.product_id;
 ```
 
+**Expected Output:**
+The following figure shows some of the rows from the output of this activity. You can see that a number of **dealership_id** are replaced with **-1** by the query, as they are indeed **NULL**. This is
+because internet sales do not go through a dealership and thus do not have a **dealership_id** value. Some of the rows also have their value in the **high_savings** column marked as **1**, indicating the sales amount is $500 or more below **base_msrp**. You can go through some rows, try to get the original data, and confirm the SQL is written properly:
+![Building a sales model query!](images/sal.png)
 
 
 
+# Aggregate Functions for Data Analysis
+You have learned how to use SQL to prepare datasets for analysis. Eventually, the purpose of data preparation is to make the data suitable for analysis so that you can make sense of it.
 
+Once the data has been prepared, the next step is to analyze it. Generally, data scientists and analytics professionals will try to understand the data by summarizing it and trying to find high-level patterns.
 
+SQL can help with this task primarily by using aggregate functions. These functions take multiple rows as input and return new information based on those input rows. 
+To begin, you will learn about aggregate functions. In this text, you will understand the fundamentals of aggregate functions through the following topics:
+- Aggregate Functions
+- Aggregate Functions with the **GROUP BY** Clause
+- Aggregate Functions with the **HAVING** Clause
+- Using Aggregates to Clean Data and Examine Data Quality
 
+## Aggregate Functions
+In addition to just seeing individual rows of data, it is also interesting to understand the properties of an entire column or table. 
 
+For example, say you just received a sample dataset of a fictional company called ZoomZoom, which specializes in car and electronic scooter retailing. You are wondering about the number of customers that this ZoomZoom database contains. You could select all the data from the
+table and then see how many rows were pulled back, but it would be incredibly tedious to do so. Luckily, there are functions provided by SQL that can be used to perform this type of calculation on large groups of rows. These functions are called **aggregate functions**.
 
+Aggregate functions take in one or more columns with multiple rows and return a number based on those columns. The following table provides a summary of the major aggregate functions that are used in SQL:
+![Major aggregate functions!](images/aggregate.png)
+
+The most frequently used aggregate functions include **SUM(), AVG(), MIN(), MAX(), COUNT(),** and **STDDEV()**.
+
+Aggregate functions can help you to smoothly execute several tasks, such as the following:
+- Aggregate functions can be used with the **WHERE** clause to calculate aggregate values for specific subsets of data. For example, if you want to know how many customers ZoomZoom has in California, you could use the following query:
+```
+SELECT
+  COUNT(*)
+FROM
+  customers
+WHERE
+  state='CA';
+  ```
+This results in the following output:
+![Result of COUNT(*) with the WHERE clause!](images/coun.png)
+
+- You can do arithmetic with aggregate functions. In the following query, you can divide the count of rows in the **customers** table by 2:
+```
+SELECT
+  COUNT(*)/2
+FROM
+  customers;
+```
+This query will return **25000**.
+![Result of function – constant calculation!](images/2.png)
+
+- You can use aggregate functions with each other in mathematical ways. If you want to calculate the average value of a specific column, you can use the **AVG** function. For example, to calculate the average **Manufacturer's Suggested Retail Price (MSRP)** of products at ZoomZoom, you can use the **AVG(base_msrp)** function in a query. In addition, you can also build the **AVG** function using **SUM** and **COUNT**, as follows:
+```
+SELECT
+   SUM(base_msrp)/COUNT(*) AS avg_base_msrp
+FROM
+   Products;
+```
+You will get the following result:
+![Result of function calculation!](images/res.png)
+
+A frequently seen scenario is a calculation involving the **COUNT()** function. For example, you can use the **COUNT** function to count the total number of ZoomZoom customers by counting the total rows in the **customers** table:
+```
+SELECT
+   COUNT(customer_id)
+FROM
+   customers;
+```
+The **COUNT** function will return the number of rows without a **NULL** value in the column. Since the **customer_id** column is a primary key and cannot be **NUL**L, the **COUNT** function will return the number of rows in the table. In this case, the query will return the following output:
+![Result of the COUNT column!](images/co.png)
+
+As shown here, the **COUNT** function works with a single column and counts how many non-**NULL** values it has. However, if the column has at least one **NULL** value, you will not be able to determine
+how many rows there are. To get a count of the number of rows in that situation, you could use the **COUNT** function with an asterisk in brackets, **(*)**, to get the total count of rows:
+```
+SELECT
+   COUNT(*)
+FROM
+   customers;
+```
+This query will also return **50000**:
+![Result of COUNT(*) as compared to the COUNT column!](images/co.png)
+
+One of the major themes you will find in data analytics is that analysis is fundamentally only useful when there is a strong variation in the data. A column where every value is exactly the same is not a particularly useful column. To identify this potential issue, it often makes sense to determine how many distinct values there are in a column. To measure the number of distinct values in a column, you can use the **COUNT DISTINCT** function. The structure of such a query would look as follows:
+```
+SELECT
+   COUNT (DISTINCT {column1})
+FROM
+   {table1}
+```
+Here, **{column1}** is the column you want to count and **{table1}** is the table with the column.
+
+For example, say you want to verify that your customers are based in all 50 states of the US, possibly with the addition of Washington D.C., which is technically a federal territory but is treated as a state in
+your system. For this, you need to know the number of unique states in the customer list. You can use **COUNT(DISTINCT expression)** to process the query:
+```
+SELECT
+   COUNT(DISTINCT state)
+FROM
+   customers;
+```
+This query returns the following output:
+![Result of COUNT DISTINCT!](images/di.png)
+
+This result shows that you do have a national customer base in all 50 states and Washington D.C.. You can also calculate the average number of customers per state using the following SQL:
+```
+SELECT
+   COUNT(customer_id)::numeric / COUNT(DISTINCT state)
+FROM
+   customers;
+```
+This query returns the following output:
+![Result of COUNT division with casting!](images/divi.png)
+
+1. Note that in the preceding SQL, the count of customer ID is cast as numeric. The reason you must cast this as numeric is that the **COUNT()** function always returns an integer. PostgreSQL treats integer division differently than float division in that it will ignore the decimal part of the result. For example, dividing 7 by 2 as integers in PostgreSQL will give you 3 instead of 3.5. In the preceding example, if you do not specify the casting, the SQL and its result will be as follows:
+```
+SELECT
+   COUNT(customer_id) / COUNT(DISTINCT state)
+FROM
+   customers;
+```
+You will get this output:
+![Result of COUNT division without casting!](images/cast.png)   
+
+2. To get a more precise answer with a decimal part, you have to cast one of the numbers as a float. There is also an easier way to convert an integer into a float, which is to multiply it by 1.0. As 1.0 is a numeric value, its calculation with an integer value will result in a numeric value. For example, the following SQL will generate the same output as the SQL in the code block above;
+![code block above!](images/divi.png)
+```
+SELECT
+   COUNT(customer_id) * 1.0 / COUNT(DISTINCT state)
+FROM
+   customers;
+```
+### Using Aggregate Functions to Analyze Data
 
 
 
