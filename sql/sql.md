@@ -1588,7 +1588,7 @@ This query produces the following result:
 ![Customer count by the state and gender query outputs in alphabetical order!](images/UNI.png)
 Fundamentally, what you are doing here is creating multiple sets of aggregation, one grouped by state and another grouped by state and gender, and then joining them together. Thus, this operation is called
 grouping sets, which means multiple sets are generated using GROUP BY. However, using **UNION ALL** is tedious and can involve writing lengthy queries. An alternative way to do this is to use the **GROUPING SETS** statement. This statement allows a user to create multiple sets of grouping for viewing, similar to the **UNION ALL** statement. For example, using the **GROUPING SETS** keyword, you could rewrite the previous **UNION ALL** query, like so:
-````
+```
 SELECT
    state,
    gender,
@@ -1604,7 +1604,17 @@ ORDER BY
 ```
 This creates the same output as the previous **UNION ALL** query.
 
+### Ordered Set Aggregates
+You can order the data using **ORDER BY**, but this is not required to
+complete the calculation, nor will the order impact the result. However, there is a subset of aggregate statistics that depends on the order of the column to calculate. For instance, the median of a column is something that requires the order of the data to be specified. To calculate these use cases, SQL offers a series of functions called **ordered set aggregate** functions. The following table lists the main ordered set aggregate functions:
+![Major ordered set aggregate functions!](images/set.png)
 
+These functions are used in the following format:
+```
+SELECT
+   {ordered_set_function} WITHIN GROUP (ORDER BY {order_column})
+FROM {table};
+```
 
 
 
