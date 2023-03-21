@@ -1507,6 +1507,104 @@ ORDER BY
    State;
 ```
 This gives you the following output:
+![Male customer count by the state query output in alphabetical order!](images/male.png)
+
+As shown here, grouping by one column can provide some great insight. You can get different aspects of the entire dataset, as well as any subset that you may think of. You can use these characteristics to
+construct a hypothesis and try to verify it. For example, you can identify the sales and the count of customers in each state, or better yet, the count of a specific subgroup of customers. From there, you
+can run a bivariate analysis, just like what you learned in Chapter 1, Understanding and Describing Data. If you can find a relationship between the sales amount and the particular group of customers, you may be able to figure out some way to reach out to more of these customers and thus increase the sales, or to figure out why other groups of customers are not as motivated.
+
+### Multiple-Column GROUP BY
+While **GROUP BY** with one column is helpful, you can go even further and use **GROUP BY** on multiple columns. For instance, say you wanted to get a count of not just the number of customers ZoomZoom had in each state but also how many male and female customers it had in each state. You can find this using multiple **GROUP BY** columns, as follows:
+```
+SELECT
+  state, gender, COUNT(*)
+FROM
+  customers
+GROUP BY
+  state, gender
+ORDER BY
+  state, gender;
+```
+This gives you the following result:
+![Customer count by the state and gender query outputs in alphabetical order!](images/alph.png)
+
+Any number of columns can be used in a **GROUP BY** operation in the same way as illustrated in the preceding example. In this case, SQL will create one group for each unique combination of column values, such as one group for **state=AK** and **gender=F**, another for **state=AK**, and **gender=M**, and so on, then calculate the aggregate function for each group and label the result with a value from all the grouping columns.
+
+### Calculating the Cost by Product Type Using GROUP BY
+You will analyze and calculate the cost of products using aggregate functions and the **GROUP BY** clause. The marketing manager wants to know the minimum, maximum, average, and standard deviation of the price for each product type that ZoomZoom sells for a marketing campaign.
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Calculate the lowest price, highest price, average price, and standard deviation of the price using the **MIN, MAX, AVG,** and **STDDEV** aggregate functions from the products table and use
+**GROUP BY** to check the price of all the different product types:
+```
+SELECT
+   product_type,
+   MIN(base_msrp),
+   MAX(base_msrp),
+   AVG(base_msrp),
+   STDDEV(base_msrp)
+FROM
+   products
+GROUP BY
+   1
+ORDER BY 1;
+```
+You should get the following result:
+![Basic price statistics by product type!](images/basic.png)
+
+
+
+## Grouping Sets
+It is very common to want to see the statistical characteristics of a dataset from several different perspectives. For instance, say you wanted to count the total number of customers you have in each
+state, while simultaneously, you also wanted the total number of male and female customers you have in each state. One way you could accomplish this is by using the **UNION ALL** keyword.
+```
+(
+SELECT
+   state,
+   NULL as gender,
+   COUNT(*)
+FROM
+   customers
+GROUP BY
+   1, 2
+ORDER BY
+   1, 2
+)
+UNION ALL
+(
+SELECT
+   state,
+   gender,
+   COUNT(*)
+FROM
+   customers
+GROUP BY
+   1, 2
+ORDER BY
+   1, 2
+)
+ORDER BY 1, 2;
+```
+This query produces the following result:
+![Customer count by the state and gender query outputs in alphabetical order!](images/UNI.png)
+Fundamentally, what you are doing here is creating multiple sets of aggregation, one grouped by state and another grouped by state and gender, and then joining them together. Thus, this operation is called
+grouping sets, which means multiple sets are generated using GROUP BY. However, using **UNION ALL** is tedious and can involve writing lengthy queries. An alternative way to do this is to use the **GROUPING SETS** statement. This statement allows a user to create multiple sets of grouping for viewing, similar to the **UNION ALL** statement. For example, using the **GROUPING SETS** keyword, you could rewrite the previous **UNION ALL** query, like so:
+````
+SELECT
+   state,
+   gender,
+   COUNT(*)
+FROM
+   customers
+GROUP BY GROUPING SETS (
+  (state),
+  (state, gender)
+)
+ORDER BY
+1, 2;
+```
+This creates the same output as the previous **UNION ALL** query.
+
+
 
 
 
