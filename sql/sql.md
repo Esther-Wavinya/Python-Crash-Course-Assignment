@@ -1507,6 +1507,143 @@ ORDER BY
    State;
 ```
 This gives you the following output:
+![Male customer count by the state query output in alphabetical order!](images/male.png)
+
+As shown here, grouping by one column can provide some great insight. You can get different aspects of the entire dataset, as well as any subset that you may think of. You can use these characteristics to
+construct a hypothesis and try to verify it. For example, you can identify the sales and the count of customers in each state, or better yet, the count of a specific subgroup of customers. From there, you
+can run a bivariate analysis, just like what you learned in Chapter 1, Understanding and Describing Data. If you can find a relationship between the sales amount and the particular group of customers, you may be able to figure out some way to reach out to more of these customers and thus increase the sales, or to figure out why other groups of customers are not as motivated.
+
+### Multiple-Column GROUP BY
+While **GROUP BY** with one column is helpful, you can go even further and use **GROUP BY** on multiple columns. For instance, say you wanted to get a count of not just the number of customers ZoomZoom had in each state but also how many male and female customers it had in each state. You can find this using multiple **GROUP BY** columns, as follows:
+```
+SELECT
+  state, gender, COUNT(*)
+FROM
+  customers
+GROUP BY
+  state, gender
+ORDER BY
+  state, gender;
+```
+This gives you the following result:
+![Customer count by the state and gender query outputs in alphabetical order!](images/alph.png)
+
+Any number of columns can be used in a **GROUP BY** operation in the same way as illustrated in the preceding example. In this case, SQL will create one group for each unique combination of column values, such as one group for **state=AK** and **gender=F**, another for **state=AK**, and **gender=M**, and so on, then calculate the aggregate function for each group and label the result with a value from all the grouping columns.
+
+### Calculating the Cost by Product Type Using GROUP BY
+You will analyze and calculate the cost of products using aggregate functions and the **GROUP BY** clause. The marketing manager wants to know the minimum, maximum, average, and standard deviation of the price for each product type that ZoomZoom sells for a marketing campaign.
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Calculate the lowest price, highest price, average price, and standard deviation of the price using the **MIN, MAX, AVG,** and **STDDEV** aggregate functions from the products table and use
+**GROUP BY** to check the price of all the different product types:
+```
+SELECT
+   product_type,
+   MIN(base_msrp),
+   MAX(base_msrp),
+   AVG(base_msrp),
+   STDDEV(base_msrp)
+FROM
+   products
+GROUP BY
+   1
+ORDER BY 1;
+```
+You should get the following result:
+![Basic price statistics by product type!](images/basic.png)
+
+
+
+## Grouping Sets
+It is very common to want to see the statistical characteristics of a dataset from several different perspectives. For instance, say you wanted to count the total number of customers you have in each
+state, while simultaneously, you also wanted the total number of male and female customers you have in each state. One way you could accomplish this is by using the **UNION ALL** keyword.
+```
+(
+SELECT
+   state,
+   NULL as gender,
+   COUNT(*)
+FROM
+   customers
+GROUP BY
+   1, 2
+ORDER BY
+   1, 2
+)
+UNION ALL
+(
+SELECT
+   state,
+   gender,
+   COUNT(*)
+FROM
+   customers
+GROUP BY
+   1, 2
+ORDER BY
+   1, 2
+)
+ORDER BY 1, 2;
+```
+This query produces the following result:
+![Customer count by the state and gender query outputs in alphabetical order!](images/UNI.png)
+Fundamentally, what you are doing here is creating multiple sets of aggregation, one grouped by state and another grouped by state and gender, and then joining them together. Thus, this operation is called
+grouping sets, which means multiple sets are generated using GROUP BY. However, using **UNION ALL** is tedious and can involve writing lengthy queries. An alternative way to do this is to use the **GROUPING SETS** statement. This statement allows a user to create multiple sets of grouping for viewing, similar to the **UNION ALL** statement. For example, using the **GROUPING SETS** keyword, you could rewrite the previous **UNION ALL** query, like so:
+```
+SELECT
+   state,
+   gender,
+   COUNT(*)
+FROM
+   customers
+GROUP BY GROUPING SETS (
+  (state),
+  (state, gender)
+)
+ORDER BY
+1, 2;
+```
+This creates the same output as the previous **UNION ALL** query.
+
+### Ordered Set Aggregates
+You can order the data using **ORDER BY**, but this is not required to
+complete the calculation, nor will the order impact the result. However, there is a subset of aggregate statistics that depends on the order of the column to calculate. For instance, the median of a column is something that requires the order of the data to be specified. To calculate these use cases, SQL offers a series of functions called **ordered set aggregate** functions. The following table lists the main ordered set aggregate functions:
+![Major ordered set aggregate functions!](images/set.png)
+
+These functions are used in the following format:
+```
+SELECT
+   {ordered_set_function} WITHIN GROUP (ORDER BY {order_column})
+FROM {table};
+```
+Here, **{ordered_set_function}** is the ordered set aggregate function, **{order_column}** is the column to order results for the function by, and **{table}** is the table the column is in. For example, you can calculate the median price of the **products** table by using the following query:
+```
+SELECT
+   PERCENTILE_CONT(0.5)
+   WITHIN GROUP (ORDER BY base_msrp)
+   AS median
+FROM
+   products;
+```
+The reason you use **0.5** is that the median is the 50th percentile, which is 0.5 as a fraction. This gives you the following result:
+![Result of an ordered set aggregate function!](images/perc.png)
+
+## Aggregate Functions with the HAVING Clause
+**GROUP BY** is a two-step process. In the first step, SQL selects rows from the original table or table set to form aggregate groups. In the second step, SQL calculates the aggregate function results. When you apply a **WHERE** clause, its conditions are applied to the original table or table set, which means it will always be applied in the first step. Sometimes, you are only interested in certain rows in the aggregate function result with certain characteristics, and only want to keep them in the query output and remove the rest. This can only happen after the aggregation has been completed and you get the results, thus it is part of the second step of **GROUP BY** processing. For example, when doing the customer counts, perhaps you are only interested in places that have at least 1,000 customers. Your first instinct may be to write something such as this:
+```
+SELECT
+  state, COUNT(*)
+FROM
+  customers
+WHERE
+  COUNT(*)>=1000
+GROUP BY
+  state
+ORDER BY
+  state;
+```
+However, you will find that the query does not work and gives you the following error:
+![Error showing the query is not working!](images/errr.png)
+
 
 
 
