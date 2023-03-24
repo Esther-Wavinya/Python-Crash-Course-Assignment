@@ -1615,6 +1615,35 @@ SELECT
    {ordered_set_function} WITHIN GROUP (ORDER BY {order_column})
 FROM {table};
 ```
+Here, **{ordered_set_function}** is the ordered set aggregate function, **{order_column}** is the column to order results for the function by, and **{table}** is the table the column is in. For example, you can calculate the median price of the **products** table by using the following query:
+```
+SELECT
+   PERCENTILE_CONT(0.5)
+   WITHIN GROUP (ORDER BY base_msrp)
+   AS median
+FROM
+   products;
+```
+The reason you use **0.5** is that the median is the 50th percentile, which is 0.5 as a fraction. This gives you the following result:
+![Result of an ordered set aggregate function!](images/perc.png)
+
+## Aggregate Functions with the HAVING Clause
+**GROUP BY** is a two-step process. In the first step, SQL selects rows from the original table or table set to form aggregate groups. In the second step, SQL calculates the aggregate function results. When you apply a **WHERE** clause, its conditions are applied to the original table or table set, which means it will always be applied in the first step. Sometimes, you are only interested in certain rows in the aggregate function result with certain characteristics, and only want to keep them in the query output and remove the rest. This can only happen after the aggregation has been completed and you get the results, thus it is part of the second step of **GROUP BY** processing. For example, when doing the customer counts, perhaps you are only interested in places that have at least 1,000 customers. Your first instinct may be to write something such as this:
+```
+SELECT
+  state, COUNT(*)
+FROM
+  customers
+WHERE
+  COUNT(*)>=1000
+GROUP BY
+  state
+ORDER BY
+  state;
+```
+However, you will find that the query does not work and gives you the following error:
+![Error showing the query is not working!](images/errr.png)
+
 
 
 
