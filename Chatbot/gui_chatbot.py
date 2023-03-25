@@ -74,6 +74,11 @@ def getResponse(ints, intents_json):
             break
     return result
 
+
+def chatbot_response(text):
+    ints = predict_class(text, model)
+    res = getResponse(ints, intents)
+    return res
 # Now we will develop a graphical user interface. Let’s use Tkinter library which is shipped with tons of useful libraries for GUI. We will take the input message from the user and then use the helper functions we have created to get the response from the bot and display it on the GUI. Here is the full source code for the GUI.
 # Creating tkinter GUI
 
@@ -87,9 +92,7 @@ def send():
         ChatBox.insert(END, "You: " + msg + '\n\n')
         ChatBox.config(foreground="#446665", font=("Verdana", 12))
 
-        ints = predict_class(msg)
-        res = getResponse(ints, intents)
-
+        res = chatbot_response(msg)
         ChatBox.insert(END, "Bot: " + res + '\n\n')
 
         ChatBox.config(state=DISABLED)
