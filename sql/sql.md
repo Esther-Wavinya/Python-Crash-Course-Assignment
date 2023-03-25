@@ -1291,8 +1291,7 @@ FROM
 The **COUNT** function will return the number of rows without a **NULL** value in the column. Since the **customer_id** column is a primary key and cannot be **NUL**L, the **COUNT** function will return the number of rows in the table. In this case, the query will return the following output:
 ![Result of the COUNT column!](images/co.png)
 
-As shown here, the **COUNT** function works with a single column and counts how many non-**NULL** values it has. However, if the column has at least one **NULL** value, you will not be able to determine
-how many rows there are. To get a count of the number of rows in that situation, you could use the **COUNT** function with an asterisk in brackets, **(*)**, to get the total count of rows:
+As shown here, the **COUNT** function works with a single column and counts how many non-**NULL** values it has. However, if the column has at least one **NULL** value, you will not be able to determine how many rows there are. To get a count of the number of rows in that situation, you could use the **COUNT** function with an asterisk in brackets, **(*)**, to get the total count of rows:
 ```
 SELECT
    COUNT(*)
@@ -1396,8 +1395,7 @@ Although you can do this, it is incredibly tedious and can take a long time if t
 **GROUP BY** is a clause that divides the rows of a dataset into multiple groups based on some sort of key that is specified in the clause. An aggregate function is then applied to all the rows within a single group to produce a single number for that group. The **GROUP BY** key and the aggregate value for the group are then displayed in the SQL output. The following diagram illustrates this general process:
 ![General GROUP BY computational model!](images/GROUP%20BY.png)
 
-In the preceding diagram, you can see that the dataset has multiple groups **(Group 1, Group 2, …, Group N)**. Here, the aggregate function is applied to all the rows in **Group 1** and generates the
-result **Aggregate 1**. Then, the aggregate function is applied to all the rows in **Group 2** and generates the result **Aggregate 2**, and so on.
+In the preceding diagram, you can see that the dataset has multiple groups **(Group 1, Group 2, …, Group N)**. Here, the aggregate function is applied to all the rows in **Group 1** and generates the result **Aggregate 1**. Then, the aggregate function is applied to all the rows in **Group 2** and generates the result **Aggregate 2**, and so on.
 
 The **GROUP BY** statements usually have the following structure:
 ```
@@ -1511,7 +1509,7 @@ This gives you the following output:
 
 As shown here, grouping by one column can provide some great insight. You can get different aspects of the entire dataset, as well as any subset that you may think of. You can use these characteristics to
 construct a hypothesis and try to verify it. For example, you can identify the sales and the count of customers in each state, or better yet, the count of a specific subgroup of customers. From there, you
-can run a bivariate analysis, just like what you learned in Chapter 1, Understanding and Describing Data. If you can find a relationship between the sales amount and the particular group of customers, you may be able to figure out some way to reach out to more of these customers and thus increase the sales, or to figure out why other groups of customers are not as motivated.
+can run a bivariate analysis,If you can find a relationship between the sales amount and the particular group of customers, you may be able to figure out some way to reach out to more of these customers and thus increase the sales, or to figure out why other groups of customers are not as motivated.
 
 ### Multiple-Column GROUP BY
 While **GROUP BY** with one column is helpful, you can go even further and use **GROUP BY** on multiple columns. For instance, say you wanted to get a count of not just the number of customers ZoomZoom had in each state but also how many male and female customers it had in each state. You can find this using multiple **GROUP BY** columns, as follows:
@@ -1554,8 +1552,7 @@ You should get the following result:
 
 
 ## Grouping Sets
-It is very common to want to see the statistical characteristics of a dataset from several different perspectives. For instance, say you wanted to count the total number of customers you have in each
-state, while simultaneously, you also wanted the total number of male and female customers you have in each state. One way you could accomplish this is by using the **UNION ALL** keyword.
+It is very common to want to see the statistical characteristics of a dataset from several different perspectives. For instance, say you wanted to count the total number of customers you have in each state, while simultaneously, you also wanted the total number of male and female customers you have in each state. One way you could accomplish this is by using the **UNION ALL** keyword.
 ```
 (
 SELECT
@@ -1586,8 +1583,7 @@ ORDER BY 1, 2;
 ```
 This query produces the following result:
 ![Customer count by the state and gender query outputs in alphabetical order!](images/UNI.png)
-Fundamentally, what you are doing here is creating multiple sets of aggregation, one grouped by state and another grouped by state and gender, and then joining them together. Thus, this operation is called
-grouping sets, which means multiple sets are generated using GROUP BY. However, using **UNION ALL** is tedious and can involve writing lengthy queries. An alternative way to do this is to use the **GROUPING SETS** statement. This statement allows a user to create multiple sets of grouping for viewing, similar to the **UNION ALL** statement. For example, using the **GROUPING SETS** keyword, you could rewrite the previous **UNION ALL** query, like so:
+Fundamentally, what you are doing here is creating multiple sets of aggregation, one grouped by state and another grouped by state and gender, and then joining them together. Thus, this operation is called grouping sets, which means multiple sets are generated using GROUP BY. However, using **UNION ALL** is tedious and can involve writing lengthy queries. An alternative way to do this is to use the **GROUPING SETS** statement. This statement allows a user to create multiple sets of grouping for viewing, similar to the **UNION ALL** statement. For example, using the **GROUPING SETS** keyword, you could rewrite the previous **UNION ALL** query, like so:
 ```
 SELECT
    state,
