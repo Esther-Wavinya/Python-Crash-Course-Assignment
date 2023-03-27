@@ -2439,7 +2439,6 @@ ORDER BY
   decile;
 ```
 The result is:
-Dealership Deciles Based on Max Daily Sales Moving 30-Day Average
 ![Dealership Deciles Based on Max Daily Sales Moving 30-Day Average](images/decile.jpg)
 
 5. Note that the moving average for 2021-01-01 is NULL here because there are no daily sales from 2020 in the **daily_sales** common table expression. So, the 30-day preceding window is empty. For 2021-01-02, the 30-day preceding window contains only one row, which is the daily sales for 2021-01-01. As it goes down the order of dates, more and more days join the window. Eventually, after 2021-01-31, it became a true 30-day preceding window.
