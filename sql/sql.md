@@ -1370,7 +1370,7 @@ From the preceding output, you can see that the minimum price is **349.99**, the
 
 
 
-### Aggregate Functions with the GROUP BY Clause
+## Aggregate Functions with the GROUP BY Clause
 So far, you have used aggregate functions to calculate statistics for an entire column. However, most times you are interested in not only the aggregate values for a whole table but also the values for smaller groups in the table. To illustrate this, refer back to the **customers** table. You know that the total number of customers is 50,000. However, you might want to know how many customers there are in each state. But how can you calculate this?
 
 You could determine how many states there are with the following query:
@@ -1391,7 +1391,7 @@ WHERE
 ```
 Although you can do this, it is incredibly tedious and can take a long time if there are many states. The **GROUP BY** clause provides a much more efficient solution.
 
-## The GROUP BY Clause
+### The GROUP BY Clause
 **GROUP BY** is a clause that divides the rows of a dataset into multiple groups based on some sort of key that is specified in the clause. An aggregate function is then applied to all the rows within a single group to produce a single number for that group. The **GROUP BY** key and the aggregate value for the group are then displayed in the SQL output. The following diagram illustrates this general process:
 ![General GROUP BY computational model!](images/GROUP%20BY.png)
 
@@ -1640,18 +1640,814 @@ ORDER BY
 However, you will find that the query does not work and gives you the following error:
 ![Error showing the query is not working!](images/errr.png)
 
+This is because **COUNT(*)** is calculated at the second step on the aggregated groups. Thus, this filter can only be applied to the aggregated groups, not the original dataset. So, using the **WHERE** clause on aggregate functions will produce an error. To use the filter on aggregate functions, you need to use a new clause: **HAVING**. The **HAVING** clause is similar to the **WHERE** clause, except it is specifically designed for **GROUP BY** queries. It applies the filter condition on the aggregated groups instead of the original dataset. The general structure of a **GROUP BY** operation with a **HAVING** statement is as follows:
+```
+SELECT
+   {KEY},
+   {AGGFUNC(column1)}
+FROM
+   {table1}
+GROUP BY
+   {KEY}
+HAVING
+   {OTHER_AGGFUNC(column2)_CONDITION}
+```
+
+Here, **{KEY}** is a column or a function on a column that is used to create individual groups, **{AGGFUNC(column1)}** is an aggregate function on a column that is calculated for all the rows within each group, **{table}** is the table or set of joined tables from which rows are separated into groups, and **{OTHER_AGGFUNC(column2)_CONDITION}** is a condition similar to what you would put in a **WHERE** clause involving an aggregate function. 
+
+### Calcualting and Displaying Data using the HAVING Clause
+You will calculate and display data using the **HAVING** clause. The sales manager of ZoomZoom wants to know the customer count for the states that have at least 1,000 customers who have purchased any product from ZoomZoom. Perform the following steps to help the manager to
+extract the data:
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Calculate the customer count by states with at least **1000** customers using the **HAVING** clause:
+```
+SELECT
+   state, COUNT(*)
+FROM
+   customers
+GROUP BY
+   state
+HAVING
+   COUNT(*)>=1000
+ORDER BY
+   state;
+```
+This query will give you the following output:
+![Customer count by states with at least 1,000 customers!](images/hav.png)
+
+Here, you can see the states that have more than 1,000 ZoomZoom customers, with **CA** having **5038**, the highest number of customers, and **CO** having **1042**, the lowest number of customers.
 
 
 
+## Using Aggregates to Clean Data and Examine Data Quality
+Aggregates add a number of techniques that can make cleaning data easier and more comprehensive.
+
+### Finding Missing Values with GROUP BY
+Using aggregates, identifying the amount of missing data can tell you not only which columns have missing data but also the usability of the columns when so much of the data is missing. Depending on the extent of missing data, you will have to determine whether it makes sense to delete rows with missing data, fill in missing values, or just delete columns if they do not have enough data to make definitive conclusions.
+
+The easiest way to determine whether a column is missing values is to use a modified **CASE WHEN** statement, which provides flexible logic to check whether a condition is met, with the **SUM** and **COUNT** functions to determine what percentage of data is missing. The query looks as follows:
+```
+SELECT
+   SUM(
+CASE
+   WHEN
+      {column1} IS NULL
+        OR
+      {column1} IN ({missing_values})
+        THEN 1
+        ELSE 0
+END
+   )::FLOAT/COUNT(*)
+FROM
+   {table1}
+```
+Here, **{column1}** is the column that you want to check for missing values, **{missing_values}** is a comma-separated list of values that are considered missing, and **{table1}** is the table or subquery with the missing values.
+
+Based on the results of this query, you may have to vary your strategy for dealing with missing data. If a very small percentage of your data is missing (<1%), then you might consider just filtering out or deleting the missing data from your analysis. If some of your data is missing (<20%), you may consider filling in your missing data with a typical value, such as the mean or the mode, to perform an accurate analysis. If more than 20% of your data is missing, you may have to remove the column from your data analysis, as there would not be enough data to make accurate conclusions based on the values in the column.
+
+Now look at missing data in the **customers** table. Specifically, look at the missing data in the **state** column. Based on some prior knowledge, the business team has determined that if the **state** column in a row contains **NULL** or is an empty string (''), this value is
+considered a missing value. You now need to determine the extent of missing values to see whether this **state** column is still useful. You will do so by dividing the number of records that have the missing value in the **state** column by the total number of the records:
+```
+SELECT
+   SUM(
+CASE
+   WHEN state IS NULL OR state IN ('') THEN 1
+      ELSE 0
+END
+   )::FLOAT/COUNT(*) AS missing_state
+FROM
+   customers;
+```
+This gives you the following output:
+![Result of NULL and missing value percentage calculation!](images/nul.png)
+As shown here, a little under 11% of the state data is missing. For analysis purposes, you may want to consider that these customers are from California, since **CA** is the most common state in the data.
+However, the far more accurate thing to do would be to find and fill in the missing data.
+
+If you are only concerned about **NULL** values, and there is no need to check other missing values, you can also use a **COUNT()** function, which counts from the column. Such a **COUNT()** function will
+only count the non-**NULL** values. By dividing this value by the total count, you will get the percentage of non-**NULL** values. By subtracting non-NULL percentage from 100%, you will get the percentage of
+**NULL** values in the total count:
+```
+SELECT
+   COUNT(state) * 1.0 / COUNT(*) AS non_null_state,
+   1 - COUNT(state) * 1.0 / COUNT(*) AS null_state
+FROM
+   customers;
+```
+This gives you the following output of the percentages of non-**NULL** and **NULL** values displayed as fractions:
+![Result of NULL value percentage calculation!](images/re.png)
+You can see that the **null_state*** value here is the same as the **missing_state** value in the previous SQL. This shows that there is actually no value with an empty string (''). All missing values are **NULL**.
+
+### Measuring Data Uniqueness with Aggregates
+Another common task that you might want to perform is to determine whether every value in a column is unique. While in many cases this can be solved by setting a column with a **PRIMARY KEY** constraint, this may not always be possible. To solve this problem, you can write the following query:
+```
+SELECT
+   COUNT (DISTINCT {column1})=COUNT(*)
+FROM
+   {table1}
+```
+Here, **{column1}** is the column you want to count and **{table1}** is the table with the column. If this query returns **True**, then the column has a unique value for every single row; otherwise, at least
+one of the values is repeated. If values are repeated in a column that you are expecting to be unique, there may be some issues with the data **Extract, Transform, and Load (ETL)** or there may be a join that has caused a row to be repeated.
+
+As a simple example, verify that the **customer_id** column in **customers** is unique:
+```
+SELECT
+   COUNT(DISTINCT customer_id)=COUNT(*) AS equal_ids
+FROM
+   customers;
+```
+This query gives you the following output, which shows that the values in the **customer_id** column are truly unique:
+![Result of comparing COUNT DISTINCT versus COUNT(*)!](images/cou.png)
+
+### Analyzing Sales Data Using Aggregate Functions
+You will analyze data using aggregate functions. The CEO, COO, and CFO of
+ZoomZoom would like to gain some insight into the common statistical characteristics of sales now that the company feels they have a strong enough analytics team with your arrival. The task has been given to you, and your boss has politely let you know that this is the most important project the analytics team has worked on. Perform the following steps to complete this activity:
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Calculate the total number of unit sales the company has made.
+```
+SELECT
+   COUNT(*)
+FROM
+   sales;
+```
+The result is as follows:
+![Result of COUNT(*) for sales units!](images/sales%20count.png)
+Note that because each sales transaction contains a product ID, there is no **NULL** value in the **product_id** column. So, **COUNT(product_id)** will also work. Similarly, **COUNT(sales_amount)** will also work.
+
+3. Calculate the total sales amount in dollars for each state.
+```
+SELECT
+c.state,
+SUM(s.sales_amount)::DECIMAL(12,2)
+FROM
+sales s
+JOIN
+customers c
+ON
+s.customer_id = c.customer_id
+GROUP BY
+c.state
+ORDER BY
+1;
+```
+The result is as follows:
+![Result of sales by state!](images/state%20sales.png)   
+
+4. Identify the top five best dealerships in terms of the most units sold (ignore internet sales).
+The most common approach to getting the top/bottom **N** rows is to run the **SELECT** statement with **ORDER BY**, then use **LIMIT** to only get the first **N** rows. In this activity, you can use **LIMIT 5**
+together with **ORDER BY DESC** to generate the top five dealerships. However, if there is a tie between the 5th and sixth elements, **LIMIT 5** will cut off between the 5th row and sixth row, regardless of whether you want both items or not. In the real world, you need to check the boundary condition carefully, that is, check the value below the limit to make sure there is no tie.
+
+For this question, if you just aim at getting the dealership ID, the following SQL is good enough. However, if you would like to have the dealership details, you need to select the information from the
+dealerships table, with a filter on the dealership IDs from the following query:
+```
+SELECT
+s.dealership_id,
+COUNT(*)
+FROM
+sales s
+WHERE
+channel <> 'internet'
+GROUP BY
+s.dealership_id
+ORDER BY
+2 DESC
+LIMIT
+5;
+```
+Here is the output:
+![Result of top five dealerships by sales!](images/sales%20dealership.png)
+
+5. Calculate the average sales amount for each channel, as shown in the sales table, and look at the average sales amount, first by **channel** sales, then by **product_id**, and then both together.
+```
+SELECT
+channel,product_id,
+AVG(sales_amount)
+FROM
+sales
+GROUP BY grouping sets (
+(channel),
+(product_id),
+(channel, product_id)
+);
+```
+The result is as follows. Note that in this screenshot (the order of rows in your result may vary), row 22 and above are grouped by both **channel** and **product_id**. Rows 23 and 24 are grouped by
+**channel** only, and row 25 and beyond are grouped by **product_id** only. In other words, there are three different sets here, one is grouped by both **channel** and **product_id**, the other two by one
+of these two columns respectively, and all three sets are eventually joined together:
+![Result of GROUPING SETS!](images/sets.png)
+
+**Expected Output**
+![Sales after the GROUPING SETS channel and product_id!](images/group.png)
+
+1. Calculate the percentage of sales transactions that have a **NULL** dealership.
+```
+SELECT
+   COUNT(dealership_id) * 1.0 / COUNT(*) AS non_null_dealership,
+   1 - COUNT(dealership_id) * 1.0 / COUNT(*) AS null_dealership
+FROM
+sales
+```
+The result is as follows:
+![Ratio of NULL values of dealership in sales!](images/null%20dealership.jpg)
+
+2. Calculate the percentage of internet sales the company has made for each year. Order the year in a timely fashion and you will get time series data. Does this time series suggest something?
+```
+SELECT
+TO_CHAR(sales_transaction_date, 'yyyy'),
+SUM(sales_amount)
+FROM
+sales
+WHERE
+channel = 'internet'
+GROUP BY
+1
+ORDER BY
+1;
+```
+The result is as follows:
+![Internet sales by year!](images/internetsales.png)
+
+From the result data, you can see that there was a significant increase in sales starting in 2015. The upward trend is continuing into 2022, which is still at the beginning of the year at the point of data
+collection (the last sales transaction date is 2022-01-25). But does this increase occur in the overall sales of ZoomZoom, or does it only happen to the internet sales channel? If it is the former, internet
+sales and non-internet sales should have a similar amount of increase. There are many ways to measure and compare these two increases. You will use the simplest form by listing the internet sales and non-internet sales side by side. The SQL will be as follows:
+```
+SELECT
+TO_CHAR(sales_transaction_date, 'yyyy'),
+SUM(
+CASE
+WHEN channel = 'internet' THEN sales_amount
+ELSE 0
+END
+) AS internet_sales,
+SUM(
+CASE
+WHEN channel <> 'internet' THEN sales_amount
+ELSE 0
+END
+) AS non_internet_sales
+FROM
+sales
+GROUP BY
+1
+ORDER BY
+1;
+```
+The result is as follows:
+![Internet and non-internet sales by year!](images/int%20sales.png)
+
+**CASE**, **NULLIF**, and **COALESCE**, are applied to one data row and will generate one output value for each row in the raw data. The aggregate functions, such as **COUNT** and **SUM**, are applied to a dataset of many rows and will generate one output value for the entire dataset. The former can be used to analyze the characteristics of a data point, while the latter can be used to analyze the statistics of a dataset.
 
 
 
+# Window Functions for Data Analysis
+You have learned simple functions such as **CASE WHEN**, **COALESCE**, and **NULLIF**. These functions receive data from a single row and produce a result for this row. The result of these functions is only determined by the data value in the row and has nothing to do with the dataset it is in.
+
+You have also learned aggregate functions such as **SUM**, **AVG**, and
+**COUNT**. These functions receive data from a dataset of multiple rows and produce a result for this dataset.
+
+Both types of functions are useful in different scenarios. For example, if you have the physical checkup results of all newborn babies in a
+country, such as weight and height, you can check each baby's health by checking these measurements to be within a given range using **CASE WHEN** function. You can also use aggregate functions to get the average and standard deviation of the weight and height of babies in this country. Both types of functions provide useful insights into the health and welfare of this country's babies.
+
+Sometimes, you may also want to know the characteristics of a data point in regard to its position in the dataset. A typical example is a rank. Rank is determined by both the measurement itself and the dataset it is in. A baby's height and weight will likely have different ranks in the dataset for the whole country and in the dataset for the city. Within the same dataset, there also might be subgroups, which are also called **partitions**, that the rank is based on. For example, ranking in different states in the whole country from the same country-wide dataset requires dividing the dataset into multiple partitions, each corresponding to a state. Ranking is thus calculated inside each partition. Within the partition, the rows related to the calculation (that is, the number of rows that are before the current row, which determines the rank of the current row) are selected to calculate the result. These selected rows form a **window**. Essentially, what you want to achieve is that given a dataset, you want to get a result for each row. This result is defined based on the value of the row, the window on which it is applied, and the dataset itself. The function used to perform this type of calculation is called **window function**.
+
+We will cover:
+- Window Functions
+- Basics of Window Functions
+- The **WINDOW** Keyword
+- Statistics with Window Functions
+- Window Frame
+
+## Window Functions
+You want to find the earliest customers for ZoomZoom. In a more technical term, this means you want to rank every customer according to the date they became a customer, with the earliest customer being ranked 1, the second-earliest customer being ranked 2, and so on. You can get all the customers using the following query:
+```
+SELECT
+   customer_id, first_name, last_name, date_added
+FROM
+   customers
+ORDER BY
+   date_added;
+```
+The result is:
+![Customers ordered by date_added!](images/date.png)
+
+You can order the customers from the earliest to the most recent, copy the output to an Excel spreadsheet, and assign a row number to each row so that you have the rank for each customer. But this is not automatic and is prone to errors. SQL provides several ways in which you can achieve it. Later, you will learn how to assign numbers to ordered records by using the **RANK** window function. Here, you can first use an aggregate function to get the dates and order them that way:
+```
+SELECT
+   date_added, COUNT(*)
+FROM
+   customers
+GROUP BY
+   date_added
+ORDER BY
+   date_added;
+```
+The following is the output of the preceding code:
+![Aggregate date-time ordering!](images/datetime.png)
+This result gives the dates in a ranked order. With this result, you can calculate how many customers joined ZoomZoom before each customer, simply by adding up the counts from the days before the customer's joining date. However, this approach is still manual, requires extra calculation, and still does not directly provide rank information. This is where window functions come into play. Window functions can take multiple rows of data and process them, but still retain all the information in the rows. For things such as ranks, this is exactly what you need.
+
+### The Basics of Window Functions
+The following is the basic syntax of a window function:
+```
+SELECT {columns},
+{window_func} OVER (PARTITION BY {partition_key} ORDER BY
+{order_key})
+FROM table1;
+```
+Here, **{columns}** are the columns to retrieve from tables for the query, **{window_func}** is the window function you want to use, **table1** is the table or joined tables you want to pull data from,
+and the **OVER** keyword indicates where the window definition starts. The window definition in this basic syntax includes two parts, **{partition_key}** and **{order_key}**. The former is the column
+or columns you want to partition on (more on this later), and the latter is the column or columns you want to order by.
+
+To illustrate this, look at an example. You might be saying to yourself that you do not know any window functions, but the truth is that all aggregate functions can be used as window functions. Now, use **COUNT(*)** in the following query:
+```
+SELECT
+   customer_id,
+   title,
+   first_name,
+   last_name,
+   gender,
+   COUNT(*) OVER () as total_customers
+FROM
+   customers
+ORDER BY
+   customer_id;
+```
+This results in the following output:
+![Customers listed using COUNT(*) partitioned by the gender window query!](images/count%20window.png)
+Here, you can see that **total_customers** has now changed counts to one of two values, **24956** or **25044**. As you use the **PARTITION BY** clause over the **gender** column, SQL divides the dataset into multiple partitions based on the unique values of this column. Inside each partition, SQL calculates the total **COUNT**. For example, there are **24956** males, so the **COUNT** window function for the male partition returns **24596**, which you can confirm with the following query:
+```
+SELECT
+   gender,
+   COUNT(*)
+FROM
+   customers
+GROUP BY
+   1;
+```
+Now you see how the partition is defined and used with the **PARTITION BY** clause. For females, the count is equal to the female count, and for males, the count is equal to the male count. What happens
+now if you use **ORDER BY** instead in the **OVER** clause as follows?
+```
+SELECT
+   customer_id, title,
+   first_name, last_name, gender,
+   COUNT(*) OVER (ORDER BY customer_id) as total_customers
+FROM
+   customers
+ORDER BY
+   customer_id;
+```
+The following is the output of the preceding code:
+![Customers listed using COUNT(*) ordered by the customer_id window query!](images/order%20customers.png)
+
+You will notice something akin to a running count for the total customers. This is where the definition of 'window' in window function comes from. When you use this window function, since you did not
+specify a **PARTITION BY**, the full dataset is used for calculation. Within this dataset, when **ORDER BY** is not specified, it is assumed that there is only one window, which contains the entire dataset.
+However, when **ORDER BY** is specified, the rows in the dataset are ordered according to it. For each unique value in the order, SQL forms a value group, which contains all the rows containing this value. The query then creates a window for each value group. The window will contain all the rows in this value group and all rows that are ordered before this value group. An example is shown below:
+![Windows for customers using COUNT(*) ordered by the customer_id window query!](images/count%20window.png)
+Here, the dataset is ordered using **customer_id**, which happens to be the primary key. As such each row has a unique value and forms a value group. The first value group, without any row before it, forms its own window, which contains only the first row. The second value group's window will contain both itself and the row before it, which means the first and second row. Then the third value group's window will contain itself and the two rows before it, and so on and so forth. Every value
+group has its window. Once the windows are established, for every value group, the window function is calculated based on the window. In this example, this means **COUNT** is applied to every window. Thus, value group 1 (the first row) gets **1** as the result since its Window 1 contains one row, value group 2 (the second row) gets **2** since its Window 2 contains two rows, and so on and so forth. The results are applied to every row in this value group if the group contains multiple rows. Note that  window is used for calculation only. The results are assigned to rows in the value group, not assigned to the rows in the window.
+
+What happens when you combine **PARTITION BY** and **ORDER BY**? Now, look at the following query:
+```
+SELECT
+   customer_id,
+   title,
+   first_name,
+   last_name,
+   gender,
+   COUNT(*) OVER (
+   PARTITION BY gender ORDER BY customer_id
+) as total_customers
+FROM
+   customers
+ORDER BY
+   customer_id;
+```
+When you run the preceding query, you get the following result:
+![Customers listed using COUNT(*) partitioned by gender ordered by the customer_id window query!](images/customer.png)
+Like the previous query, it appears to be some sort of rank. However, it seems to differ based on gender. In this particular SQL, the query divides the table into two subsets based on the column **PARTITION BY**. That is because the **PARTITION BY** clause, like **GROUP BY**, will first divide the dataset into groups (which is called partition here) based on the value in the **gender** column. Each partition is then used as a basis for doing a count, with each partition having its own set of value groups. These value groups are ordered inside the partition, windows are created based on the value groups and their orders, and the window function is applied to the values. The results are finally assigned to every row in the value groups.
+
+This process is illustrated in Figure below. This process produces the count you can see. The three keywords, **OVER()**, **PARTITION BY**, and **ORDER BY**, are the foundation of the power of window functions.
+![Windows for customers listed using COUNT(*) partitioned by gender and ordered by the customer_id window query!](images/customerid.png)
+
+#### Analyzing Customer Data Fill Rates over Time
+You will apply window functions to a dataset and analyze the data. For the last six months, ZoomZoom has been experimenting with various promotions to make their customers more engaged in the sale activity. One way to measure the level of engagement is to measure people's
+willingness to fill out all fields on the customer form, especially their address. To achieve this goal, the company would like a running total of how many users have filled in their street addresses over time.
+Write a query to produce these results.
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Use window functions and write a query that will return customer information and how many people have filled out their street address. Also, order the list by date. The query will look as follows:
+```
+SELECT
+   customer_id,
+   street_address,
+   date_added::DATE,
+COUNT(
+   CASE
+     WHEN street_address IS NOT NULL THEN customer_id
+     ELSE NULL
+   END
+) OVER (ORDER BY date_added::DATE)
+as non_null_street_address,
+  COUNT(*) OVER (ORDER BY date_added::DATE)
+    as total_street_address
+FROM
+   customers
+ORDER BY
+   date_added;
+```
+You should get the following result:
+![Street address filter ordered by the date_added window query!](images/date%20added.png)
+
+3. Write a query to see how the numbers of people filling out the street field change over time.
+```
+-- Step 2
+SELECT 
+  customer_id, 
+  street_address, 
+  date_added::DATE,
+  COUNT(
+    CASE 
+      WHEN street_address IS NOT NULL THEN customer_id 
+      ELSE NULL 
+    END
+  ) OVER (ORDER BY date_added::DATE) 
+    as non_null_street_address,
+  COUNT(*) OVER (ORDER BY date_added::DATE) 
+    as total_street_address
+FROM 
+  customers
+ORDER BY 
+  date_added;
+```
+
+4. In step 1, you have already got every customer address ordered by the signup date. In Figure 5.10, the two columns following the signup date column are the number of non-**NULL** addresses and the number of all customer addresses for each rolling day, that is, a sum from the beginning of sales to the current day. As you learned before, by dividing the number of non-**NULL** addresses by the number of all customer addresses, you can get the percentage of customers with non-**NULL** street addresses and derive the percentage of customers with **NULL** street addresses. Tracking this number will provide an insight into the way customers interact with your sales force over time. Also, because both numbers of addresses are calculated for each rolling day, the percentage is also for each rolling day. This is an example of different window functions sharing the same window in the same query.
+```
+-- Step 3
+WITH 
+  daily_rolling_count as (
+    SELECT 
+      customer_id, 
+      street_address, 
+      date_added::DATE,
+      COUNT(
+        CASE 
+          WHEN street_address IS NOT NULL THEN customer_id 
+          ELSE NULL 
+        END
+      ) OVER (ORDER BY date_added::DATE) 
+        as non_null_street_address,
+      COUNT(*) OVER (ORDER BY date_added::DATE) 
+        as total_street_address
+    FROM 
+      customers
+  )
+SELECT DISTINCT
+  date_added,
+  non_null_street_address,
+  total_street_address,
+  1 - 1.0 * non_null_street_address/total_street_address
+    AS null_address_percentage 
+FROM
+  daily_rolling_count
+ORDER BY 
+  date_added;
+```
+The result is:
+![Percent of NULL Addresses per day!](images/null%20addresses.png)
+This result will give you the list of the rolling percentage of **NULL** street address in each day. You can then provide the full dataset to data analytics and visualization software such as Excel to study the
+general trend of the data, discover patterns of change, and raise suggestions on how to increase the engagement of customers to the company management.
+
+## The WINDOW Keyword
+In many scenarios, your analysis involves running multiple functions
+against the same window so that you can compare them side by side, and you are very likely running them within the same query. For example, when you are doing some gender-based analysis, you may be interested in calculating a running total number of customers as well as the running total number of customers with a title, using the same partition that is based on gender. You will result in writing the following query:
+```
+SELECT
+   customer_id,
+   title,
+   first_name,
+   last_name,
+   gender,
+   COUNT(*) OVER (
+     PARTITION BY gender ORDER BY customer_id
+  ) as total_customers,
+   SUM(CASE WHEN title IS NOT NULL THEN 1 ELSE 0 END) OVER (
+     PARTITION BY gender ORDER BY customer_id
+  ) as total_customers_title
+FROM customers
+ORDER BY customer_id;
+```
+The following is the output of the preceding code:
+![Running total of customers overall with the title by gender window query](images/genderwindow.png)
+
+Although the query gives you the result, it can be tedious to write—especially the **OVER** clause as it is the same for the two functions. Fortunately, you can simplify this by using the **WINDOW** clause to define a generic window for multiple functions in the same query. The **WINDOW** clause facilitates the aliasing of a window.
+
+You can simplify the preceding query by writing it as follows:
+```
+SELECT
+   customer_id,
+   title,
+   first_name,
+   last_name,
+   gender,
+   COUNT(*) OVER w as total_customers,
+   SUM(
+     CASE
+       WHEN title IS NOT NULL THEN 1
+       ELSE 0
+     END
+) OVER w as total_customers_title
+FROM
+   customers
+WINDOW w AS (
+   PARTITION BY gender ORDER BY customer_id
+)
+ORDER BY customer_id;
+```
+This query should give you the same result you can see in the preceding screenshot. However, you did not have to write a long **PARTITION BY** and **ORDER BY** query for each window function. Instead, you simply made an alias with the defined **WINDOW w**.
+
+## Statistics with Window Functions
+Now that you understand how window functions work, you can start using them to calculate useful statistics, such as ranks, percentiles, and rolling statistics.
+
+In the following table, you have summarized a variety of statistical functions that are useful. It is also important to emphasize again that all aggregate functions can also be used as window functions (**AVG**,
+**SUM**, **COUNT**, and so on):
+![Statistical window functions!](images/statisticalwindow.png)
+
+Normally, a call to any of these functions inside a SQL statement would be followed by the **OVER** keyword. This keyword will then be followed by more keywords like **PARTITION BY** and **ORDER BY**, either of which may be optional, depending on which function you are using.
+
+For example, the **ROW_NUMBER()** function will look like this:
+```
+ROW_NUMBER() OVER(
+   PARTITION BY column_1, column_2
+   ORDER BY column_3, column_4
+)
+```
+### Rank Order of Hiring
+You will use statistical window functions to understand a dataset. ZoomZoom would like to have a marketing campaign for their most tenured customers in different states. ZoomZoom wants you to write a query that will rank the customers according to their joining date (date_added) for each state. Perform the following steps.
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Calculate a rank for every customer, with a rank of 1 going to the first **date_added**, 2 to the second one, and so on, using the **RANK()** function:
+```
+SELECT
+   customer_id,
+   first_name,
+   last_name,
+   state,
+   date_added::DATE,
+   RANK() OVER (
+      PARTITION BY state ORDER BY date_added
+   ) AS cust_rank
+FROM
+   customers
+ORDER BY
+   state, cust_rank;
+```
+The following is the output of the preceding code:
+![Salespeople rank-ordered by tenure!](images/salesptenure.png)
+Here, you can see every customer with their information and rank in the **cust_rank** column based on their joining date for each state.
+
+**Note**
+One question regarding **RANK()** is the handling of tied values. **RANK()** is defined as the rank of rows, not the rank of values. For example, if the first two rows have a tie, the third row will get **3** from the **RANK()** function. **DENSE_RANK()** could also be used just as easily as **RANK()**, but it is defined as the rank of values, not the rank of rows. In the example above, the value of **DENSE_RANK()** for
+the third row will be **2** instead of **3**, as the third row contains the 2nd value in the list of values.
+
+## Window Frame
+A window function query using the window frame clause would look as follows:
+```
+SELECT
+{columns},
+{window_func} OVER (
+PARTITION BY {partition_key}
+ORDER BY {order_key}
+{rangeorrows} BETWEEN {frame_start} AND {frame_end}
+)
+FROM
+{table1};
+```
+Here, **{columns}** are the columns to retrieve from tables for the query, **{window_func}** is the window function you want to use, **{partition_key}** is the column or columns you want to partition on, **{order_key}** is the column or columns you want to order by, **{rangeorrows}** is either the **RANGE** keyword or the **ROWS** keyword, **{frame_start}** is a keyword indicating where to start the window frame, **{frame_end}** is a keyword indicating where to end the window frame, and **{table1}** is the table or joined tables you want to pull data from.
+
+One point to consider is the values that **{frame_start}** and **{frame_end}** can take. To give further details, **{frame_start}** and **{frame_end}** can be one of the following values:
+- **UNBOUNDED PRECEDING**: A keyword that, when used for **{frame_start}**, refers to the first record of the partition.
+- **{offset} PRECEDING**: A keyword referring to **{offset}** (an integer) rows or ranges before the current row.
+- **CURRENT ROW**: Refers to the current row.
+- **{offset} FOLLOWING**: A keyword referring to **{offset}** (an integer) rows or ranges after the current row.
+- **UNBOUNDED FOLLOWING**: A keyword that, when used for **{frame_end}**, refers to the last record of the partition.
+
+By adjusting the window, various useful statistics can be calculated. One such useful statistic is the **rolling average**. The rolling average is simply the average for a statistic in a given time window. For
+instance, you want to calculate the seven-day rolling average of sales over time for ZoomZoom. You will need to get the daily sales first by running a **SUM … GROUP BY sales_transaction_date**. This will provide you with a list of daily sales, each row being a day with sales. When you order this list of rows by date, the six preceding rows plus the current row will provide you with a window of seven rolling days. Taking an **AVG** over these seven rows will give you the seven-day rolling average of the given day.
+This calculation can be accomplished with the following query:
+```
+WITH 
+  daily_sales as (
+    SELECT 
+      sales_transaction_date::DATE,
+      SUM(sales_amount) as total_sales
+    FROM sales
+    GROUP BY 1
+  ),
+  moving_average_calculation_7 AS (
+    SELECT 
+      sales_transaction_date, 
+      total_sales,
+      AVG(total_sales) OVER (
+        ORDER BY sales_transaction_date 
+        ROWS BETWEEN 6 PRECEDING and CURRENT ROW
+      ) AS sales_moving_average_7,
+      ROW_NUMBER() OVER (
+        ORDER BY sales_transaction_date
+      ) as row_number
+    FROM 
+      daily_sales
+    ORDER BY 1
+  )
+SELECT 
+  sales_transaction_date,
+  CASE 
+    WHEN row_number>=7 THEN sales_moving_average_7 
+    ELSE NULL 
+  END AS sales_moving_average_7
+FROM 
+  moving_average_calculation_7;
+```
+The following is the output of the preceding code:
+![The seven-day moving average of sales!](images/moving.png)
+
+A natural question when considering N-day moving window is how to handle the first N-1 days in the ordered column. In the previous query, the first six rows are defined as null using a **CASE** statement
+because in this scenario the seven-day moving average is only defined if there are seven days' worth of information. Without the **CASE** statement, the window calculation will calculate values for the first
+seven days using the first few days. For these days, the seven-day moving average is the average of whatever days are in the window. For example, the seven-day moving average for the second day is the average of the first day and second day, and the seven-day moving average for the sixth day is the average of the first six days. Both this approach of calculation and the **NULL** approach can make sense in their respective situations. It is up to the data analyst to determine which one makes more sense to a particular question.
+
+Another point of difference to consider is the difference between using a **RANGE** or **ROW** in a frame clause. In the previous example, you used **ROW** as the daily sales contain one row per day. ROW refers
+to actual rows and will take the rows before and after the current row to calculate values. **RANGE** refers to the values of the **{frame_start}** and **{frame_end}** in the **{order key}** column. It
+differs from **ROW** when two rows have the same values based on the **ORDER BY** clause used in the window. If there are multiple rows having the same value as the value designated in **{frame_start}** or **{frame_end}**, all these rows will be added to the window frame when
+**RANGE** is specified.
+
+### Team Lunch Motivation
+You will use a window frame to find some important information in your data. To help improve sales performance, the sales team has decided to buy lunch for all salespeople at the company every time they beat the figure for the best daily total earnings achieved over the last 30 days. Write a query that produces the total sales in dollars for a given day and the target the salespeople must beat for that day, starting from January 1, 2019.
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Calculate the total sales for a given day and the target using the following query:
+```
+WITH 
+  daily_sales as (
+    SELECT 
+      sales_transaction_date::DATE,
+      SUM(sales_amount) as total_sales
+    FROM 
+      sales
+    GROUP BY
+      1
+  ),
+  sales_stats_30 AS (
+    SELECT 
+      sales_transaction_date, 
+      total_sales,
+      MAX(total_sales) OVER (
+        ORDER BY sales_transaction_date 
+        ROWS BETWEEN 30 PRECEDING and 1 PRECEDING
+      ) AS max_sales_30
+    FROM 
+      daily_sales
+    ORDER BY
+      1
+  )
+SELECT 
+  sales_transaction_date, 
+  total_sales,
+  max_sales_30
+FROM 
+  sales_stats_30
+WHERE
+  sales_transaction_date>='2019-01-01';
+```
+You should get the following results:
+![Best sales over the last 30 days!](images/bestsales.png)
+Notice the use of a window frame from **30 PRECEDING to 1 PRECEDING**. By using **1 PRECEDING**, you are removing the current row from the calculation. The result is a 30-day rolling max in the 30 days before the current day.
+
+3. Now you will calculate the total sales each day and compare it with that day's target, which is the 30-day moving average you just calculated in the previous step. The total sales in each day have already been calculated in the SQL above in the first common table expression and are later referenced in the main query. So, you can write the following SQL:
+```
+WITH 
+  daily_sales as (
+    SELECT 
+      sales_transaction_date::DATE,
+      SUM(sales_amount) as total_sales
+    FROM sales
+    GROUP BY 1
+  ),
+  sales_stats_30 AS (
+    SELECT 
+      sales_transaction_date, 
+      total_sales,
+      MAX(total_sales) OVER (
+        ORDER BY sales_transaction_date 
+        ROWS BETWEEN 30 PRECEDING and 1 PRECEDING
+      ) AS max_sales_30
+    FROM 
+      daily_sales
+    ORDER BY 1
+  )
+SELECT 
+  sales_transaction_date, 
+  total_sales,
+  max_sales_30
+FROM 
+  sales_stats_30
+WHERE
+  total_sales > max_sales_30 
+AND
+  sales_transaction_date>='2019-01-01';
+```
+The output:
+![Max Daily Sales Moving-30 Day!](images/max%20daily.png)
 
 
+### Analyzing Sales Using Window Frames and Window Functions
+You will use window functions and window frames in various ways to gain insight into sales data. It is the beginning of the year, and time to plan the selling strategy for the new year at ZoomZoom. The sales team wants to see how the company has performed overall, as well as how
+individual days have performed over the year. To achieve this, ZoomZoom's head of Sales would like you to run an analysis for them.
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Calculate the total sales amount by day for all the days in the year 2021 (that is, before the date January 1, 2022).
+```
+SELECT
+sales_transaction_date::date,
+SUM(sales_amount) sales_amount
+FROM
+sales
+WHERE
+sales_transaction_date::date BETWEEN '20210101' AND '20211231'
+GROUP BY
+sales_transaction_date::date;
+```
+The result is:
+![Daily total sales amount!](images/total%20daily%20sales.png)
 
+3. Calculate the rolling 30-day average for the daily total sales amount.
+```
+WITH 
+  daily_sales as (
+    SELECT 
+      sales_transaction_date::date, 
+      SUM(sales_amount) sales_amount
+    FROM 
+      sales
+    WHERE
+      sales_transaction_date::date BETWEEN '20210101' AND '20211231'
+    GROUP BY
+      sales_transaction_date::date
+  )
+SELECT
+  sales_transaction_date,
+  sales_amount,
+  AVG(sales_amount) OVER w AS moving_avg
+FROM 
+  daily_sales 
+WINDOW w AS (
+  ORDER BY sales_transaction_date 
+  ROWS BETWEEN 30 PRECEDING AND 1 PRECEDING
+)
+ORDER BY 1;
+```
+The result is:
+![Daily Sales Moving 30-Day Average!](images/moving%20acg.png)
 
+4. Calculate which decile each date would be in compared to other days based on their daily 30-day rolling sales amount.
+```
+WITH 
+  daily_sales as (
+    SELECT 
+      sales_transaction_date::date, 
+      SUM(sales_amount) sales_amount
+    FROM 
+      sales
+    WHERE
+      sales_transaction_date::date BETWEEN '20210101' AND '20211231'
+    GROUP BY
+      sales_transaction_date::date
+  ),
+  moving_avg AS (
+    SELECT
+      sales_transaction_date,
+      sales_amount,
+      AVG(sales_amount) OVER w AS moving_avg
+    FROM 
+      daily_sales 
+    WINDOW w AS (
+      ORDER BY sales_transaction_date 
+      ROWS BETWEEN 30 PRECEDING AND 1 PRECEDING
+    )
+  )
+SELECT
+  sales_transaction_date,
+  sales_amount,
+  moving_avg,
+  NTILE(10) OVER (ORDER BY moving_avg DESC) AS decile
+FROM 
+  moving_avg m
+WHERE 
+  moving_avg IS NOT NULL
+ORDER BY 
+  decile;
+```
+The result is:
+![Dealership Deciles Based on Max Daily Sales Moving 30-Day Average](images/decile.jpg)
 
+5. Note that the moving average for 2021-01-01 is NULL here because there are no daily sales from 2020 in the **daily_sales** common table expression. So, the 30-day preceding window is empty. For 2021-01-02, the 30-day preceding window contains only one row, which is the daily sales for 2021-01-01. As it goes down the order of dates, more and more days join the window. Eventually, after 2021-01-31, it became a true 30-day preceding window.
 
+This activity intentionally applies the **sales_transaction_date::date BETWEEN '20210101' AND '20211231'** filter to the **daily_sales** common table expression to provide you with an illustration of what might happen for the first few rows in the moving average window creation.
+
+In reality, a better way is to include the last 30-day sales of 2020 in the **daily_sales** common table expression so that you can still calculate the moving average properly for days in January 2021 and use a 2021 date range in the main query to only display the 2021 data.
+
+In this activity, you used window functions to get the sales trend of your entire year and utilized this sales trend to identify the days that ZoomZoom is doing well or less ideal.
 
 
 
