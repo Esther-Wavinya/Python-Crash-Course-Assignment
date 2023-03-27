@@ -1370,7 +1370,7 @@ From the preceding output, you can see that the minimum price is **349.99**, the
 
 
 
-### Aggregate Functions with the GROUP BY Clause
+## Aggregate Functions with the GROUP BY Clause
 So far, you have used aggregate functions to calculate statistics for an entire column. However, most times you are interested in not only the aggregate values for a whole table but also the values for smaller groups in the table. To illustrate this, refer back to the **customers** table. You know that the total number of customers is 50,000. However, you might want to know how many customers there are in each state. But how can you calculate this?
 
 You could determine how many states there are with the following query:
@@ -1391,7 +1391,7 @@ WHERE
 ```
 Although you can do this, it is incredibly tedious and can take a long time if there are many states. The **GROUP BY** clause provides a much more efficient solution.
 
-## The GROUP BY Clause
+### The GROUP BY Clause
 **GROUP BY** is a clause that divides the rows of a dataset into multiple groups based on some sort of key that is specified in the clause. An aggregate function is then applied to all the rows within a single group to produce a single number for that group. The **GROUP BY** key and the aggregate value for the group are then displayed in the SQL output. The following diagram illustrates this general process:
 ![General GROUP BY computational model!](images/GROUP%20BY.png)
 
@@ -1640,17 +1640,264 @@ ORDER BY
 However, you will find that the query does not work and gives you the following error:
 ![Error showing the query is not working!](images/errr.png)
 
+This is because **COUNT(*)** is calculated at the second step on the aggregated groups. Thus, this filter can only be applied to the aggregated groups, not the original dataset. So, using the **WHERE** clause on aggregate functions will produce an error. To use the filter on aggregate functions, you need to use a new clause: **HAVING**. The **HAVING** clause is similar to the **WHERE** clause, except it is specifically designed for **GROUP BY** queries. It applies the filter condition on the aggregated groups instead of the original dataset. The general structure of a **GROUP BY** operation with a **HAVING** statement is as follows:
+```
+SELECT
+   {KEY},
+   {AGGFUNC(column1)}
+FROM
+   {table1}
+GROUP BY
+   {KEY}
+HAVING
+   {OTHER_AGGFUNC(column2)_CONDITION}
+```
+
+Here, **{KEY}** is a column or a function on a column that is used to create individual groups, **{AGGFUNC(column1)}** is an aggregate function on a column that is calculated for all the rows within each group, **{table}** is the table or set of joined tables from which rows are separated into groups, and **{OTHER_AGGFUNC(column2)_CONDITION}** is a condition similar to what you would put in a **WHERE** clause involving an aggregate function. 
+
+### Calcualting and Displaying Data using the HAVING Clause
+You will calculate and display data using the **HAVING** clause. The sales manager of ZoomZoom wants to know the customer count for the states that have at least 1,000 customers who have purchased any product from ZoomZoom. Perform the following steps to help the manager to
+extract the data:
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Calculate the customer count by states with at least **1000** customers using the **HAVING** clause:
+```
+SELECT
+   state, COUNT(*)
+FROM
+   customers
+GROUP BY
+   state
+HAVING
+   COUNT(*)>=1000
+ORDER BY
+   state;
+```
+This query will give you the following output:
+![Customer count by states with at least 1,000 customers!](images/hav.png)
+
+Here, you can see the states that have more than 1,000 ZoomZoom customers, with **CA** having **5038**, the highest number of customers, and **CO** having **1042**, the lowest number of customers.
 
 
 
+## Using Aggregates to Clean Data and Examine Data Quality
+Aggregates add a number of techniques that can make cleaning data easier and more comprehensive.
+
+### Finding Missing Values with GROUP BY
+Using aggregates, identifying the amount of missing data can tell you not only which columns have missing data but also the usability of the columns when so much of the data is missing. Depending on the extent of missing data, you will have to determine whether it makes sense to delete rows with missing data, fill in missing values, or just delete columns if they do not have enough data to make definitive conclusions.
+
+The easiest way to determine whether a column is missing values is to use a modified **CASE WHEN** statement, which provides flexible logic to check whether a condition is met, with the **SUM** and **COUNT** functions to determine what percentage of data is missing. The query looks as follows:
+```
+SELECT
+   SUM(
+CASE
+   WHEN
+      {column1} IS NULL
+        OR
+      {column1} IN ({missing_values})
+        THEN 1
+        ELSE 0
+END
+   )::FLOAT/COUNT(*)
+FROM
+   {table1}
+```
+Here, **{column1}** is the column that you want to check for missing values, **{missing_values}** is a comma-separated list of values that are considered missing, and **{table1}** is the table or subquery with the missing values.
+
+Based on the results of this query, you may have to vary your strategy for dealing with missing data. If a very small percentage of your data is missing (<1%), then you might consider just filtering out or deleting the missing data from your analysis. If some of your data is missing (<20%), you may consider filling in your missing data with a typical value, such as the mean or the mode, to perform an accurate analysis. If more than 20% of your data is missing, you may have to remove the column from your data analysis, as there would not be enough data to make accurate conclusions based on the values in the column.
+
+Now look at missing data in the **customers** table. Specifically, look at the missing data in the **state** column. Based on some prior knowledge, the business team has determined that if the **state** column in a row contains **NULL** or is an empty string (''), this value is
+considered a missing value. You now need to determine the extent of missing values to see whether this **state** column is still useful. You will do so by dividing the number of records that have the missing value in the **state** column by the total number of the records:
+```
+SELECT
+   SUM(
+CASE
+   WHEN state IS NULL OR state IN ('') THEN 1
+      ELSE 0
+END
+   )::FLOAT/COUNT(*) AS missing_state
+FROM
+   customers;
+```
+This gives you the following output:
+![Result of NULL and missing value percentage calculation!](images/nul.png)
+As shown here, a little under 11% of the state data is missing. For analysis purposes, you may want to consider that these customers are from California, since **CA** is the most common state in the data.
+However, the far more accurate thing to do would be to find and fill in the missing data.
+
+If you are only concerned about **NULL** values, and there is no need to check other missing values, you can also use a **COUNT()** function, which counts from the column. Such a **COUNT()** function will
+only count the non-**NULL** values. By dividing this value by the total count, you will get the percentage of non-**NULL** values. By subtracting non-NULL percentage from 100%, you will get the percentage of
+**NULL** values in the total count:
+```
+SELECT
+   COUNT(state) * 1.0 / COUNT(*) AS non_null_state,
+   1 - COUNT(state) * 1.0 / COUNT(*) AS null_state
+FROM
+   customers;
+```
+This gives you the following output of the percentages of non-**NULL** and **NULL** values displayed as fractions:
+![Result of NULL value percentage calculation!](images/re.png)
+You can see that the **null_state*** value here is the same as the **missing_state** value in the previous SQL. This shows that there is actually no value with an empty string (''). All missing values are **NULL**.
+
+### Measuring Data Uniqueness with Aggregates
+Another common task that you might want to perform is to determine whether every value in a column is unique. While in many cases this can be solved by setting a column with a **PRIMARY KEY** constraint, this may not always be possible. To solve this problem, you can write the following query:
+```
+SELECT
+   COUNT (DISTINCT {column1})=COUNT(*)
+FROM
+   {table1}
+```
+Here, **{column1}** is the column you want to count and **{table1}** is the table with the column. If this query returns **True**, then the column has a unique value for every single row; otherwise, at least
+one of the values is repeated. If values are repeated in a column that you are expecting to be unique, there may be some issues with the data **Extract, Transform, and Load (ETL)** or there may be a join that has caused a row to be repeated.
+
+As a simple example, verify that the **customer_id** column in **customers** is unique:
+```
+SELECT
+   COUNT(DISTINCT customer_id)=COUNT(*) AS equal_ids
+FROM
+   customers;
+```
+This query gives you the following output, which shows that the values in the **customer_id** column are truly unique:
+![Result of comparing COUNT DISTINCT versus COUNT(*)!](images/cou.png)
+
+### Analyzing Sales Data Using Aggregate Functions
+You will analyze data using aggregate functions. The CEO, COO, and CFO of
+ZoomZoom would like to gain some insight into the common statistical characteristics of sales now that the company feels they have a strong enough analytics team with your arrival. The task has been given to you, and your boss has politely let you know that this is the most important project the analytics team has worked on. Perform the following steps to complete this activity:
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Calculate the total number of unit sales the company has made.
+```
+SELECT
+   COUNT(*)
+FROM
+   sales;
+```
+The result is as follows:
+![Result of COUNT(*) for sales units!](images/sales%20count.png)
+Note that because each sales transaction contains a product ID, there is no **NULL** value in the **product_id** column. So, **COUNT(product_id)** will also work. Similarly, **COUNT(sales_amount)** will also work.
+
+3. Calculate the total sales amount in dollars for each state.
+```
+SELECT
+c.state,
+SUM(s.sales_amount)::DECIMAL(12,2)
+FROM
+sales s
+JOIN
+customers c
+ON
+s.customer_id = c.customer_id
+GROUP BY
+c.state
+ORDER BY
+1;
+```
+The result is as follows:
+![Result of sales by state!](images/state%20sales.png)   
+
+4. Identify the top five best dealerships in terms of the most units sold (ignore internet sales).
+The most common approach to getting the top/bottom **N** rows is to run the **SELECT** statement with **ORDER BY**, then use **LIMIT** to only get the first **N** rows. In this activity, you can use **LIMIT 5**
+together with **ORDER BY DESC** to generate the top five dealerships. However, if there is a tie between the 5th and sixth elements, **LIMIT 5** will cut off between the 5th row and sixth row, regardless of whether you want both items or not. In the real world, you need to check the boundary condition carefully, that is, check the value below the limit to make sure there is no tie.
+
+For this question, if you just aim at getting the dealership ID, the following SQL is good enough. However, if you would like to have the dealership details, you need to select the information from the
+dealerships table, with a filter on the dealership IDs from the following query:
+```
+SELECT
+s.dealership_id,
+COUNT(*)
+FROM
+sales s
+WHERE
+channel <> 'internet'
+GROUP BY
+s.dealership_id
+ORDER BY
+2 DESC
+LIMIT
+5;
+```
+Here is the output:
+![Result of top five dealerships by sales!](images/sales%20dealership.png)
+
+5. Calculate the average sales amount for each channel, as shown in the sales table, and look at the average sales amount, first by **channel** sales, then by **product_id**, and then both together.
+```
+SELECT
+channel,product_id,
+AVG(sales_amount)
+FROM
+sales
+GROUP BY grouping sets (
+(channel),
+(product_id),
+(channel, product_id)
+);
+```
+The result is as follows. Note that in this screenshot (the order of rows in your result may vary), row 22 and above are grouped by both **channel** and **product_id**. Rows 23 and 24 are grouped by
+**channel** only, and row 25 and beyond are grouped by **product_id** only. In other words, there are three different sets here, one is grouped by both **channel** and **product_id**, the other two by one
+of these two columns respectively, and all three sets are eventually joined together:
+![Result of GROUPING SETS!](images/sets.png)
+
+**Expected Output**
+![Sales after the GROUPING SETS channel and product_id!](images/group.png)
+
+1. Calculate the percentage of sales transactions that have a **NULL** dealership.
+```
+SELECT
+   COUNT(dealership_id) * 1.0 / COUNT(*) AS non_null_dealership,
+   1 - COUNT(dealership_id) * 1.0 / COUNT(*) AS null_dealership
+FROM
+sales
+```
+The result is as follows:
+![Ratio of NULL values of dealership in sales!](images/null%20dealership.jpg)
+
+2. Calculate the percentage of internet sales the company has made for each year. Order the year in a timely fashion and you will get time series data. Does this time series suggest something?
+```
+SELECT
+TO_CHAR(sales_transaction_date, 'yyyy'),
+SUM(sales_amount)
+FROM
+sales
+WHERE
+channel = 'internet'
+GROUP BY
+1
+ORDER BY
+1;
+```
+The result is as follows:
+![Internet sales by year!](images/internetsales.png)
+
+From the result data, you can see that there was a significant increase in sales starting in 2015. The upward trend is continuing into 2022, which is still at the beginning of the year at the point of data
+collection (the last sales transaction date is 2022-01-25). But does this increase occur in the overall sales of ZoomZoom, or does it only happen to the internet sales channel? If it is the former, internet
+sales and non-internet sales should have a similar amount of increase. There are many ways to measure and compare these two increases. You will use the simplest form by listing the internet sales and non-internet sales side by side. The SQL will be as follows:
+```
+SELECT
+TO_CHAR(sales_transaction_date, 'yyyy'),
+SUM(
+CASE
+WHEN channel = 'internet' THEN sales_amount
+ELSE 0
+END
+) AS internet_sales,
+SUM(
+CASE
+WHEN channel <> 'internet' THEN sales_amount
+ELSE 0
+END
+) AS non_internet_sales
+FROM
+sales
+GROUP BY
+1
+ORDER BY
+1;
+```
+The result is as follows:
+![Internet and non-internet sales by year!](images/int%20sales.png)
+
+**CASE**, **NULLIF**, and **COALESCE**, are applied to one data row and will generate one output value for each row in the raw data. The aggregate functions, such as **COUNT** and **SUM**, are applied to a dataset of many rows and will generate one output value for the entire dataset. The former can be used to analyze the characteristics of a data point, while the latter can be used to analyze the statistics of a dataset.
 
 
 
-
-
-
-
-
+# Window Functions for Data Analysis
 
 
 
