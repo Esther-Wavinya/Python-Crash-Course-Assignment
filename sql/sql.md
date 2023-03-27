@@ -2205,6 +2205,251 @@ One question regarding **RANK()** is the handling of tied values. **RANK()** is 
 the third row will be **2** instead of **3**, as the third row contains the 2nd value in the list of values.
 
 ## Window Frame
+A window function query using the window frame clause would look as follows:
+```
+SELECT
+{columns},
+{window_func} OVER (
+PARTITION BY {partition_key}
+ORDER BY {order_key}
+{rangeorrows} BETWEEN {frame_start} AND {frame_end}
+)
+FROM
+{table1};
+```
+Here, **{columns}** are the columns to retrieve from tables for the query, **{window_func}** is the window function you want to use, **{partition_key}** is the column or columns you want to partition on, **{order_key}** is the column or columns you want to order by, **{rangeorrows}** is either the **RANGE** keyword or the **ROWS** keyword, **{frame_start}** is a keyword indicating where to start the window frame, **{frame_end}** is a keyword indicating where to end the window frame, and **{table1}** is the table or joined tables you want to pull data from.
+
+One point to consider is the values that **{frame_start}** and **{frame_end}** can take. To give further details, **{frame_start}** and **{frame_end}** can be one of the following values:
+- **UNBOUNDED PRECEDING**: A keyword that, when used for **{frame_start}**, refers to the first record of the partition.
+- **{offset} PRECEDING**: A keyword referring to **{offset}** (an integer) rows or ranges before the current row.
+- **CURRENT ROW**: Refers to the current row.
+- **{offset} FOLLOWING**: A keyword referring to **{offset}** (an integer) rows or ranges after the current row.
+- **UNBOUNDED FOLLOWING**: A keyword that, when used for **{frame_end}**, refers to the last record of the partition.
+
+By adjusting the window, various useful statistics can be calculated. One such useful statistic is the **rolling average**. The rolling average is simply the average for a statistic in a given time window. For
+instance, you want to calculate the seven-day rolling average of sales over time for ZoomZoom. You will need to get the daily sales first by running a **SUM … GROUP BY sales_transaction_date**. This will provide you with a list of daily sales, each row being a day with sales. When you order this list of rows by date, the six preceding rows plus the current row will provide you with a window of seven rolling days. Taking an **AVG** over these seven rows will give you the seven-day rolling average of the given day.
+This calculation can be accomplished with the following query:
+```
+WITH 
+  daily_sales as (
+    SELECT 
+      sales_transaction_date::DATE,
+      SUM(sales_amount) as total_sales
+    FROM sales
+    GROUP BY 1
+  ),
+  moving_average_calculation_7 AS (
+    SELECT 
+      sales_transaction_date, 
+      total_sales,
+      AVG(total_sales) OVER (
+        ORDER BY sales_transaction_date 
+        ROWS BETWEEN 6 PRECEDING and CURRENT ROW
+      ) AS sales_moving_average_7,
+      ROW_NUMBER() OVER (
+        ORDER BY sales_transaction_date
+      ) as row_number
+    FROM 
+      daily_sales
+    ORDER BY 1
+  )
+SELECT 
+  sales_transaction_date,
+  CASE 
+    WHEN row_number>=7 THEN sales_moving_average_7 
+    ELSE NULL 
+  END AS sales_moving_average_7
+FROM 
+  moving_average_calculation_7;
+```
+The following is the output of the preceding code:
+![The seven-day moving average of sales!](images/moving.png)
+
+A natural question when considering N-day moving window is how to handle the first N-1 days in the ordered column. In the previous query, the first six rows are defined as null using a **CASE** statement
+because in this scenario the seven-day moving average is only defined if there are seven days' worth of information. Without the **CASE** statement, the window calculation will calculate values for the first
+seven days using the first few days. For these days, the seven-day moving average is the average of whatever days are in the window. For example, the seven-day moving average for the second day is the average of the first day and second day, and the seven-day moving average for the sixth day is the average of the first six days. Both this approach of calculation and the **NULL** approach can make sense in their respective situations. It is up to the data analyst to determine which one makes more sense to a particular question.
+
+Another point of difference to consider is the difference between using a **RANGE** or **ROW** in a frame clause. In the previous example, you used **ROW** as the daily sales contain one row per day. ROW refers
+to actual rows and will take the rows before and after the current row to calculate values. **RANGE** refers to the values of the **{frame_start}** and **{frame_end}** in the **{order key}** column. It
+differs from **ROW** when two rows have the same values based on the **ORDER BY** clause used in the window. If there are multiple rows having the same value as the value designated in **{frame_start}** or **{frame_end}**, all these rows will be added to the window frame when
+**RANGE** is specified.
+
+### Team Lunch Motivation
+You will use a window frame to find some important information in your data. To help improve sales performance, the sales team has decided to buy lunch for all salespeople at the company every time they beat the figure for the best daily total earnings achieved over the last 30 days. Write a query that produces the total sales in dollars for a given day and the target the salespeople must beat for that day, starting from January 1, 2019.
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Calculate the total sales for a given day and the target using the following query:
+```
+WITH 
+  daily_sales as (
+    SELECT 
+      sales_transaction_date::DATE,
+      SUM(sales_amount) as total_sales
+    FROM 
+      sales
+    GROUP BY
+      1
+  ),
+  sales_stats_30 AS (
+    SELECT 
+      sales_transaction_date, 
+      total_sales,
+      MAX(total_sales) OVER (
+        ORDER BY sales_transaction_date 
+        ROWS BETWEEN 30 PRECEDING and 1 PRECEDING
+      ) AS max_sales_30
+    FROM 
+      daily_sales
+    ORDER BY
+      1
+  )
+SELECT 
+  sales_transaction_date, 
+  total_sales,
+  max_sales_30
+FROM 
+  sales_stats_30
+WHERE
+  sales_transaction_date>='2019-01-01';
+```
+You should get the following results:
+![Best sales over the last 30 days!](images/bestsales.png)
+Notice the use of a window frame from **30 PRECEDING to 1 PRECEDING**. By using **1 PRECEDING**, you are removing the current row from the calculation. The result is a 30-day rolling max in the 30 days before the current day.
+
+3. Now you will calculate the total sales each day and compare it with that day's target, which is the 30-day moving average you just calculated in the previous step. The total sales in each day have already been calculated in the SQL above in the first common table expression and are later referenced in the main query. So, you can write the following SQL:
+```
+WITH 
+  daily_sales as (
+    SELECT 
+      sales_transaction_date::DATE,
+      SUM(sales_amount) as total_sales
+    FROM sales
+    GROUP BY 1
+  ),
+  sales_stats_30 AS (
+    SELECT 
+      sales_transaction_date, 
+      total_sales,
+      MAX(total_sales) OVER (
+        ORDER BY sales_transaction_date 
+        ROWS BETWEEN 30 PRECEDING and 1 PRECEDING
+      ) AS max_sales_30
+    FROM 
+      daily_sales
+    ORDER BY 1
+  )
+SELECT 
+  sales_transaction_date, 
+  total_sales,
+  max_sales_30
+FROM 
+  sales_stats_30
+WHERE
+  total_sales > max_sales_30 
+AND
+  sales_transaction_date>='2019-01-01';
+```
+The output:
+![Max Daily Sales Moving-30 Day!](images/max%20daily.png)
+
+
+### Analyzing Sales Using Window Frames and Window Functions
+You will use window functions and window frames in various ways to gain insight into sales data. It is the beginning of the year, and time to plan the selling strategy for the new year at ZoomZoom. The sales team wants to see how the company has performed overall, as well as how
+individual days have performed over the year. To achieve this, ZoomZoom's head of Sales would like you to run an analysis for them.
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Calculate the total sales amount by day for all the days in the year 2021 (that is, before the date January 1, 2022).
+```
+SELECT
+sales_transaction_date::date,
+SUM(sales_amount) sales_amount
+FROM
+sales
+WHERE
+sales_transaction_date::date BETWEEN '20210101' AND '20211231'
+GROUP BY
+sales_transaction_date::date;
+```
+The result is:
+![Daily total sales amount!](images/total%20daily%20sales.png)
+
+3. Calculate the rolling 30-day average for the daily total sales amount.
+```
+WITH 
+  daily_sales as (
+    SELECT 
+      sales_transaction_date::date, 
+      SUM(sales_amount) sales_amount
+    FROM 
+      sales
+    WHERE
+      sales_transaction_date::date BETWEEN '20210101' AND '20211231'
+    GROUP BY
+      sales_transaction_date::date
+  )
+SELECT
+  sales_transaction_date,
+  sales_amount,
+  AVG(sales_amount) OVER w AS moving_avg
+FROM 
+  daily_sales 
+WINDOW w AS (
+  ORDER BY sales_transaction_date 
+  ROWS BETWEEN 30 PRECEDING AND 1 PRECEDING
+)
+ORDER BY 1;
+```
+The result is:
+![Daily Sales Moving 30-Day Average!](images/moving%20acg.png)
+
+4. Calculate which decile each date would be in compared to other days based on their daily 30-day rolling sales amount.
+```
+WITH 
+  daily_sales as (
+    SELECT 
+      sales_transaction_date::date, 
+      SUM(sales_amount) sales_amount
+    FROM 
+      sales
+    WHERE
+      sales_transaction_date::date BETWEEN '20210101' AND '20211231'
+    GROUP BY
+      sales_transaction_date::date
+  ),
+  moving_avg AS (
+    SELECT
+      sales_transaction_date,
+      sales_amount,
+      AVG(sales_amount) OVER w AS moving_avg
+    FROM 
+      daily_sales 
+    WINDOW w AS (
+      ORDER BY sales_transaction_date 
+      ROWS BETWEEN 30 PRECEDING AND 1 PRECEDING
+    )
+  )
+SELECT
+  sales_transaction_date,
+  sales_amount,
+  moving_avg,
+  NTILE(10) OVER (ORDER BY moving_avg DESC) AS decile
+FROM 
+  moving_avg m
+WHERE 
+  moving_avg IS NOT NULL
+ORDER BY 
+  decile;
+```
+The result is:
+Dealership Deciles Based on Max Daily Sales Moving 30-Day Average
+![Dealership Deciles Based on Max Daily Sales Moving 30-Day Average](images/decile.jpg)
+
+5. Note that the moving average for 2021-01-01 is NULL here because there are no daily sales from 2020 in the **daily_sales** common table expression. So, the 30-day preceding window is empty. For 2021-01-02, the 30-day preceding window contains only one row, which is the daily sales for 2021-01-01. As it goes down the order of dates, more and more days join the window. Eventually, after 2021-01-31, it became a true 30-day preceding window.
+
+This activity intentionally applies the **sales_transaction_date::date BETWEEN '20210101' AND '20211231'** filter to the **daily_sales** common table expression to provide you with an illustration of what might happen for the first few rows in the moving average window creation.
+
+In reality, a better way is to include the last 30-day sales of 2020 in the **daily_sales** common table expression so that you can still calculate the moving average properly for days in January 2021 and use a 2021 date range in the main query to only display the 2021 data.
+
+In this activity, you used window functions to get the sales trend of your entire year and utilized this sales trend to identify the days that ZoomZoom is doing well or less ideal.
+
 
 
 
