@@ -1898,8 +1898,313 @@ The result is as follows:
 
 
 # Window Functions for Data Analysis
+You have learned simple functions such as **CASE WHEN**, **COALESCE**, and **NULLIF**. These functions receive data from a single row and produce a result for this row. The result of these functions is only determined by the data value in the row and has nothing to do with the dataset it is in.
 
+You have also learned aggregate functions such as **SUM**, **AVG**, and
+**COUNT**. These functions receive data from a dataset of multiple rows and produce a result for this dataset.
 
+Both types of functions are useful in different scenarios. For example, if you have the physical checkup results of all newborn babies in a
+country, such as weight and height, you can check each baby's health by checking these measurements to be within a given range using **CASE WHEN** function. You can also use aggregate functions to get the average and standard deviation of the weight and height of babies in this country. Both types of functions provide useful insights into the health and welfare of this country's babies.
+
+Sometimes, you may also want to know the characteristics of a data point in regard to its position in the dataset. A typical example is a rank. Rank is determined by both the measurement itself and the dataset it is in. A baby's height and weight will likely have different ranks in the dataset for the whole country and in the dataset for the city. Within the same dataset, there also might be subgroups, which are also called **partitions**, that the rank is based on. For example, ranking in different states in the whole country from the same country-wide dataset requires dividing the dataset into multiple partitions, each corresponding to a state. Ranking is thus calculated inside each partition. Within the partition, the rows related to the calculation (that is, the number of rows that are before the current row, which determines the rank of the current row) are selected to calculate the result. These selected rows form a **window**. Essentially, what you want to achieve is that given a dataset, you want to get a result for each row. This result is defined based on the value of the row, the window on which it is applied, and the dataset itself. The function used to perform this type of calculation is called **window function**.
+
+We will cover:
+- Window Functions
+- Basics of Window Functions
+- The **WINDOW** Keyword
+- Statistics with Window Functions
+- Window Frame
+
+## Window Functions
+You want to find the earliest customers for ZoomZoom. In a more technical term, this means you want to rank every customer according to the date they became a customer, with the earliest customer being ranked 1, the second-earliest customer being ranked 2, and so on. You can get all the customers using the following query:
+```
+SELECT
+   customer_id, first_name, last_name, date_added
+FROM
+   customers
+ORDER BY
+   date_added;
+```
+The result is:
+![Customers ordered by date_added!](images/date.png)
+
+You can order the customers from the earliest to the most recent, copy the output to an Excel spreadsheet, and assign a row number to each row so that you have the rank for each customer. But this is not automatic and is prone to errors. SQL provides several ways in which you can achieve it. Later, you will learn how to assign numbers to ordered records by using the **RANK** window function. Here, you can first use an aggregate function to get the dates and order them that way:
+```
+SELECT
+   date_added, COUNT(*)
+FROM
+   customers
+GROUP BY
+   date_added
+ORDER BY
+   date_added;
+```
+The following is the output of the preceding code:
+![Aggregate date-time ordering!](images/datetime.png)
+This result gives the dates in a ranked order. With this result, you can calculate how many customers joined ZoomZoom before each customer, simply by adding up the counts from the days before the customer's joining date. However, this approach is still manual, requires extra calculation, and still does not directly provide rank information. This is where window functions come into play. Window functions can take multiple rows of data and process them, but still retain all the information in the rows. For things such as ranks, this is exactly what you need.
+
+### The Basics of Window Functions
+The following is the basic syntax of a window function:
+```
+SELECT {columns},
+{window_func} OVER (PARTITION BY {partition_key} ORDER BY
+{order_key})
+FROM table1;
+```
+Here, **{columns}** are the columns to retrieve from tables for the query, **{window_func}** is the window function you want to use, **table1** is the table or joined tables you want to pull data from,
+and the **OVER** keyword indicates where the window definition starts. The window definition in this basic syntax includes two parts, **{partition_key}** and **{order_key}**. The former is the column
+or columns you want to partition on (more on this later), and the latter is the column or columns you want to order by.
+
+To illustrate this, look at an example. You might be saying to yourself that you do not know any window functions, but the truth is that all aggregate functions can be used as window functions. Now, use **COUNT(*)** in the following query:
+```
+SELECT
+   customer_id,
+   title,
+   first_name,
+   last_name,
+   gender,
+   COUNT(*) OVER () as total_customers
+FROM
+   customers
+ORDER BY
+   customer_id;
+```
+This results in the following output:
+![Customers listed using COUNT(*) partitioned by the gender window query!](images/count%20window.png)
+Here, you can see that **total_customers** has now changed counts to one of two values, **24956** or **25044**. As you use the **PARTITION BY** clause over the **gender** column, SQL divides the dataset into multiple partitions based on the unique values of this column. Inside each partition, SQL calculates the total **COUNT**. For example, there are **24956** males, so the **COUNT** window function for the male partition returns **24596**, which you can confirm with the following query:
+```
+SELECT
+   gender,
+   COUNT(*)
+FROM
+   customers
+GROUP BY
+   1;
+```
+Now you see how the partition is defined and used with the **PARTITION BY** clause. For females, the count is equal to the female count, and for males, the count is equal to the male count. What happens
+now if you use **ORDER BY** instead in the **OVER** clause as follows?
+```
+SELECT
+   customer_id, title,
+   first_name, last_name, gender,
+   COUNT(*) OVER (ORDER BY customer_id) as total_customers
+FROM
+   customers
+ORDER BY
+   customer_id;
+```
+The following is the output of the preceding code:
+![Customers listed using COUNT(*) ordered by the customer_id window query!](images/order%20customers.png)
+
+You will notice something akin to a running count for the total customers. This is where the definition of 'window' in window function comes from. When you use this window function, since you did not
+specify a **PARTITION BY**, the full dataset is used for calculation. Within this dataset, when **ORDER BY** is not specified, it is assumed that there is only one window, which contains the entire dataset.
+However, when **ORDER BY** is specified, the rows in the dataset are ordered according to it. For each unique value in the order, SQL forms a value group, which contains all the rows containing this value. The query then creates a window for each value group. The window will contain all the rows in this value group and all rows that are ordered before this value group. An example is shown below:
+![Windows for customers using COUNT(*) ordered by the customer_id window query!](images/count%20window.png)
+Here, the dataset is ordered using **customer_id**, which happens to be the primary key. As such each row has a unique value and forms a value group. The first value group, without any row before it, forms its own window, which contains only the first row. The second value group's window will contain both itself and the row before it, which means the first and second row. Then the third value group's window will contain itself and the two rows before it, and so on and so forth. Every value
+group has its window. Once the windows are established, for every value group, the window function is calculated based on the window. In this example, this means **COUNT** is applied to every window. Thus, value group 1 (the first row) gets **1** as the result since its Window 1 contains one row, value group 2 (the second row) gets **2** since its Window 2 contains two rows, and so on and so forth. The results are applied to every row in this value group if the group contains multiple rows. Note that  window is used for calculation only. The results are assigned to rows in the value group, not assigned to the rows in the window.
+
+What happens when you combine **PARTITION BY** and **ORDER BY**? Now, look at the following query:
+```
+SELECT
+   customer_id,
+   title,
+   first_name,
+   last_name,
+   gender,
+   COUNT(*) OVER (
+   PARTITION BY gender ORDER BY customer_id
+) as total_customers
+FROM
+   customers
+ORDER BY
+   customer_id;
+```
+When you run the preceding query, you get the following result:
+![Customers listed using COUNT(*) partitioned by gender ordered by the customer_id window query!](images/customer.png)
+Like the previous query, it appears to be some sort of rank. However, it seems to differ based on gender. In this particular SQL, the query divides the table into two subsets based on the column **PARTITION BY**. That is because the **PARTITION BY** clause, like **GROUP BY**, will first divide the dataset into groups (which is called partition here) based on the value in the **gender** column. Each partition is then used as a basis for doing a count, with each partition having its own set of value groups. These value groups are ordered inside the partition, windows are created based on the value groups and their orders, and the window function is applied to the values. The results are finally assigned to every row in the value groups.
+
+This process is illustrated in Figure below. This process produces the count you can see. The three keywords, **OVER()**, **PARTITION BY**, and **ORDER BY**, are the foundation of the power of window functions.
+![Windows for customers listed using COUNT(*) partitioned by gender and ordered by the customer_id window query!](images/customerid.png)
+
+#### Analyzing Customer Data Fill Rates over Time
+You will apply window functions to a dataset and analyze the data. For the last six months, ZoomZoom has been experimenting with various promotions to make their customers more engaged in the sale activity. One way to measure the level of engagement is to measure people's
+willingness to fill out all fields on the customer form, especially their address. To achieve this goal, the company would like a running total of how many users have filled in their street addresses over time.
+Write a query to produce these results.
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Use window functions and write a query that will return customer information and how many people have filled out their street address. Also, order the list by date. The query will look as follows:
+```
+SELECT
+   customer_id,
+   street_address,
+   date_added::DATE,
+COUNT(
+   CASE
+     WHEN street_address IS NOT NULL THEN customer_id
+     ELSE NULL
+   END
+) OVER (ORDER BY date_added::DATE)
+as non_null_street_address,
+  COUNT(*) OVER (ORDER BY date_added::DATE)
+    as total_street_address
+FROM
+   customers
+ORDER BY
+   date_added;
+```
+You should get the following result:
+![Street address filter ordered by the date_added window query!](images/date%20added.png)
+
+3. Write a query to see how the numbers of people filling out the street field change over time.
+```
+-- Step 2
+SELECT 
+  customer_id, 
+  street_address, 
+  date_added::DATE,
+  COUNT(
+    CASE 
+      WHEN street_address IS NOT NULL THEN customer_id 
+      ELSE NULL 
+    END
+  ) OVER (ORDER BY date_added::DATE) 
+    as non_null_street_address,
+  COUNT(*) OVER (ORDER BY date_added::DATE) 
+    as total_street_address
+FROM 
+  customers
+ORDER BY 
+  date_added;
+```
+
+4. In step 1, you have already got every customer address ordered by the signup date. In Figure 5.10, the two columns following the signup date column are the number of non-**NULL** addresses and the number of all customer addresses for each rolling day, that is, a sum from the beginning of sales to the current day. As you learned before, by dividing the number of non-**NULL** addresses by the number of all customer addresses, you can get the percentage of customers with non-**NULL** street addresses and derive the percentage of customers with **NULL** street addresses. Tracking this number will provide an insight into the way customers interact with your sales force over time. Also, because both numbers of addresses are calculated for each rolling day, the percentage is also for each rolling day. This is an example of different window functions sharing the same window in the same query.
+```
+-- Step 3
+WITH 
+  daily_rolling_count as (
+    SELECT 
+      customer_id, 
+      street_address, 
+      date_added::DATE,
+      COUNT(
+        CASE 
+          WHEN street_address IS NOT NULL THEN customer_id 
+          ELSE NULL 
+        END
+      ) OVER (ORDER BY date_added::DATE) 
+        as non_null_street_address,
+      COUNT(*) OVER (ORDER BY date_added::DATE) 
+        as total_street_address
+    FROM 
+      customers
+  )
+SELECT DISTINCT
+  date_added,
+  non_null_street_address,
+  total_street_address,
+  1 - 1.0 * non_null_street_address/total_street_address
+    AS null_address_percentage 
+FROM
+  daily_rolling_count
+ORDER BY 
+  date_added;
+```
+The result is:
+![Percent of NULL Addresses per day!](images/null%20addresses.png)
+This result will give you the list of the rolling percentage of **NULL** street address in each day. You can then provide the full dataset to data analytics and visualization software such as Excel to study the
+general trend of the data, discover patterns of change, and raise suggestions on how to increase the engagement of customers to the company management.
+
+## The WINDOW Keyword
+In many scenarios, your analysis involves running multiple functions
+against the same window so that you can compare them side by side, and you are very likely running them within the same query. For example, when you are doing some gender-based analysis, you may be interested in calculating a running total number of customers as well as the running total number of customers with a title, using the same partition that is based on gender. You will result in writing the following query:
+```
+SELECT
+   customer_id,
+   title,
+   first_name,
+   last_name,
+   gender,
+   COUNT(*) OVER (
+     PARTITION BY gender ORDER BY customer_id
+  ) as total_customers,
+   SUM(CASE WHEN title IS NOT NULL THEN 1 ELSE 0 END) OVER (
+     PARTITION BY gender ORDER BY customer_id
+  ) as total_customers_title
+FROM customers
+ORDER BY customer_id;
+```
+The following is the output of the preceding code:
+![Running total of customers overall with the title by gender window query](images/genderwindow.png)
+
+Although the query gives you the result, it can be tedious to write—especially the **OVER** clause as it is the same for the two functions. Fortunately, you can simplify this by using the **WINDOW** clause to define a generic window for multiple functions in the same query. The **WINDOW** clause facilitates the aliasing of a window.
+
+You can simplify the preceding query by writing it as follows:
+```
+SELECT
+   customer_id,
+   title,
+   first_name,
+   last_name,
+   gender,
+   COUNT(*) OVER w as total_customers,
+   SUM(
+     CASE
+       WHEN title IS NOT NULL THEN 1
+       ELSE 0
+     END
+) OVER w as total_customers_title
+FROM
+   customers
+WINDOW w AS (
+   PARTITION BY gender ORDER BY customer_id
+)
+ORDER BY customer_id;
+```
+This query should give you the same result you can see in the preceding screenshot. However, you did not have to write a long **PARTITION BY** and **ORDER BY** query for each window function. Instead, you simply made an alias with the defined **WINDOW w**.
+
+## Statistics with Window Functions
+Now that you understand how window functions work, you can start using them to calculate useful statistics, such as ranks, percentiles, and rolling statistics.
+
+In the following table, you have summarized a variety of statistical functions that are useful. It is also important to emphasize again that all aggregate functions can also be used as window functions (**AVG**,
+**SUM**, **COUNT**, and so on):
+![Statistical window functions!](images/statisticalwindow.png)
+
+Normally, a call to any of these functions inside a SQL statement would be followed by the **OVER** keyword. This keyword will then be followed by more keywords like **PARTITION BY** and **ORDER BY**, either of which may be optional, depending on which function you are using.
+
+For example, the **ROW_NUMBER()** function will look like this:
+```
+ROW_NUMBER() OVER(
+   PARTITION BY column_1, column_2
+   ORDER BY column_3, column_4
+)
+```
+### Rank Order of Hiring
+You will use statistical window functions to understand a dataset. ZoomZoom would like to have a marketing campaign for their most tenured customers in different states. ZoomZoom wants you to write a query that will rank the customers according to their joining date (date_added) for each state. Perform the following steps.
+1. Open **pgAdmin**, connect to the **sqlda** database, and open SQL query editor.
+2. Calculate a rank for every customer, with a rank of 1 going to the first **date_added**, 2 to the second one, and so on, using the **RANK()** function:
+```
+SELECT
+   customer_id,
+   first_name,
+   last_name,
+   state,
+   date_added::DATE,
+   RANK() OVER (
+      PARTITION BY state ORDER BY date_added
+   ) AS cust_rank
+FROM
+   customers
+ORDER BY
+   state, cust_rank;
+```
+The following is the output of the preceding code:
+![Salespeople rank-ordered by tenure!](images/salesptenure.png)
+Here, you can see every customer with their information and rank in the **cust_rank** column based on their joining date for each state.
+
+**Note**
+One question regarding **RANK()** is the handling of tied values. **RANK()** is defined as the rank of rows, not the rank of values. For example, if the first two rows have a tie, the third row will get **3** from the **RANK()** function. **DENSE_RANK()** could also be used just as easily as **RANK()**, but it is defined as the rank of values, not the rank of rows. In the example above, the value of **DENSE_RANK()** for
+the third row will be **2** instead of **3**, as the third row contains the 2nd value in the list of values.
+
+## Window Frame
 
 
 
