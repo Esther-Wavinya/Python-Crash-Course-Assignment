@@ -2399,6 +2399,7 @@ ORDER BY 1;
 ```
 The result is:
 ![Daily Sales Moving 30-Day Average!](images/moving%20acg.png)
+Note that the moving average for 2021-01-01 is NULL here because there are no daily sales from 2020 in the **daily_sales** common table expression. So, the 30-day preceding window is empty. For 2021-01-02, the 30-day preceding window contains only one row, which is the daily sales for 2021-01-01. As it goes down the order of dates, more and more days join the window. Eventually, after 2021-01-31, it became a true 30-day preceding window.
 
 4. Calculate which decile each date would be in compared to other days based on their daily 30-day rolling sales amount.
 ```
@@ -2441,13 +2442,343 @@ ORDER BY
 The result is:
 ![Dealership Deciles Based on Max Daily Sales Moving 30-Day Average](images/decile.jpg)
 
-5. Note that the moving average for 2021-01-01 is NULL here because there are no daily sales from 2020 in the **daily_sales** common table expression. So, the 30-day preceding window is empty. For 2021-01-02, the 30-day preceding window contains only one row, which is the daily sales for 2021-01-01. As it goes down the order of dates, more and more days join the window. Eventually, after 2021-01-31, it became a true 30-day preceding window.
 
 This activity intentionally applies the **sales_transaction_date::date BETWEEN '20210101' AND '20211231'** filter to the **daily_sales** common table expression to provide you with an illustration of what might happen for the first few rows in the moving average window creation.
 
 In reality, a better way is to include the last 30-day sales of 2020 in the **daily_sales** common table expression so that you can still calculate the moving average properly for days in January 2021 and use a 2021 date range in the main query to only display the 2021 data.
 
 In this activity, you used window functions to get the sales trend of your entire year and utilized this sales trend to identify the days that ZoomZoom is doing well or less ideal.
+
+
+
+
+# Importing and Exporting Data
+To extract insights from your database, you need data. While many companies store and update data within a central database, there are scenarios in which you will need more data than is currently in your database. For example, you are working on an ambitious project to revamp a website whose performance has progressively degraded over the past nine years. The first step in solving such a problem is to do a root cause analysis of it. The central database houses daily logs of the site's page load times along with other details. You will need to
+retrieve this data, clean it up, and filter out the entries where the page load times were over a certain threshold. You will need to share this information with a team of engineers and developers who will
+categorize these outliers, attributing the poor load times to a server issue, badly written code, network failure, or poor caching, among other things. You will then need to do an analysis of the categorized data and update the database to include the "fault categories" as provided to you by the developers who do not have access to the database. For all this, you will first need to retrieve the data and store it in an Excel file that can be shared with the developers.
+
+Not only will you want to upload data to your database for further analysis, but if you are doing advanced analytics, there will also be situations wherein you will need to download data from your database (for
+example, if you want to carry out a form of statistical analysis that is unavailable in SQL). For this reason, you will also learn about the process of extracting data from a database. This will allow you to use other software to analyze your data. You will look at how you can integrate your workflows with a specific programming language that is frequently used for analytics: Python. It is powerful because it is easy to use, allows advanced functionality, is open source, and has large communities supporting it due to its popularity. You will examine how large datasets can be passed between your programming language and your databases efficiently so that you can have workflows that take advantage of the analytics software tools that are available.
+
+You will learn how to efficiently upload data to a centralized database for further analysis. You will start by looking at the bulk uploading and downloading functionality in the PostgreSQL **COPY** command as well as the command-line client, **psql**, and how to run the **COPY** command locally using the **\COPY** command from **psql**. To use the **\COPY** command, you will also gain an understanding of the concept of view, which by itself is a very important tool in any RDBMS. You will then move on to studying how to handle data using Python. You will learn how to integrate Python with PostgreSQL, how to use SQL from Python scripts, and how to use Python libraries to achieve various analyses.
+
+## The COPY Command
+At this point, you are probably familiar with the **SELECT** statement, which allows you to retrieve data from a database. While this command is useful for small datasets that can be scanned quickly, you will often want to save a large dataset to a file. By saving these datasets to files, you can further process or analyze the data locally using Excel or Python. To retrieve these large datasets, you can use the PostgreSQL **COPY** command, which efficiently transfers data from a database to a file, or from a file to a database. This **COPY** command must be executed when connected to the PostgreSQL database using a SQL client, such as the PostgreSQL **psql** command. In the next section, you will learn how to use the **psq**l command, then you will learn how to copy data with it.
+
+### Running the psql Command
+You have been using the **pgAdmin** frontend client to access your PostgreSQL database, and you have briefly used the **psql** tool when you set up your PostgreSQL environment. But you might not be aware that **psql** was one of the first PostgreSQL clients. This interface is still in use today. It enables users to run PostgreSQL scripts that can interact with the database server within the local computing environment.
+
+The syntax of the **psql** command is as follows:
+```
+psql -h <host> -p <port> -d <database> -U <username>
+```
+In this command, you pass in flags that provide the information needed to make the database connection. In this case, you have the following:
+- **-h** is the flag for the hostname. The string that comes after it (separated by a space) should be the hostname for your database, which can be an IP address, a domain name, or **localhost** if it is run on the local machine.
+- **-p** is the flag for the database port. Usually, this is **5432** for PostgreSQL databases.
+- **-d** is the flag for the database name. The string that comes after it should be the database name. In this text, you will always use the **sqlda** database.
+- **-U** is the flag for the username. It is succeeded by the username. In this text, you will use the PostgreSQL super username, which is **postgres**.
+
+Applying the syntax to the environment you set up for this text, that is, to locally connect to the sqlda database that is on your local system as the postgres user, you can use this command:
+```
+psql -h localhost -p 5432 -d sqlda -U postgres
+```
+You will be prompted to enter your password, which is the password you entered for the superuser when you installed PostgreSQL on your computer. After that, the cursor will change to **sqlda=#**, where **sqlda** is the current database that you are running in.
+
+You can also simply run the **psql** command without the parameters. It will prompt you for all the information mentioned above. Once it has been entered, you will be provided with the same **sqlda=#** command interface as shown below.
+
+You are now inside **psql** and can execute SQL just like you can in **pgAdmin**. For example, you can execute the following query:
+```
+SELECT
+   product_id
+FROM
+   products
+LIMIT
+   5;
+```
+![Running SQL in psql!](images/psqlda.jpg)
+
+
+### The COPY Statement
+The **COPY** statement retrieves data from your database and dumps it into the file format that you choose. For example, consider the following statement:
+```
+COPY (
+SELECT
+   customer_id,
+   first_name,
+   last_name
+FROM
+   customers
+LIMIT
+   5
+)
+TO STDOUT
+WITH CSV HEADER;
+```
+The following is the output of the code:
+![Using COPY to print the results to STDOUT in CSV file format!](images/copys.jpg)
+This statement returns five rows from the **customers** table, with each record on a new line, and each value separated by a comma, in a typical **.csv** file format. The header is also included at the top.
+
+Because the target of the **COPY** command is specified as **STDOUT**, the results will only be copied into the command-line interface and not into a file. Here is a breakdown of this command and the parameters that
+were passed in:
+- **COPY** is simply the command used to transfer data to a file format.
+- **(SELECT customer_id, first_name, last_name FROM customers LIMIT 5)** is the query that you want to copy the result from.
+- **TO STDOUT** indicates that the results should be printed to the standard output rather than being saved to a file on the hard drive. Standard output is the common term for displaying output in a command-
+line terminal environment, which is often shortened to STDOUT.
+- **WITH** is an optional keyword used to separate the parameters that you will use in the database-to-file transfer. Within **WITH**, you can specify multiple parameters, such as the following:
+- **CSV** indicates that you will use the **CSV** file format. You could have also specified **BINARY** or left this out altogether and received the output in text format.
+- **HEADER** indicates that you want the header printed as well.
+
+While the **STDOUT** option is useful, often, you will want to save data to a file. The **COPY** command offers the functionality to do this, but data is saved locally on the PostgreSQL server. You must specify the full file path (relative file paths are not permitted). If you have your PostgreSQL database running on your computer, you can test this out using the following command in psql:
+```
+COPY (
+SELECT *
+FROM customers
+LIMIT 5
+)
+TO 'c:\Users\Public\my_file.csv'
+WITH CSV HEADER;
+```
+The output will be the following:
+![Output of the COPY statement!](images/cop.png)
+
+You will find that the file has now been saved in **CSV** format at the location you specified in the command.
+
+Note that this example is executed in a PostgreSQL server that is hosted on a Linux machine. So, the full file path is in Linux file path format. If you are running the command on any other operating system, you
+need to adjust the file path accordingly. Also, you must use a folder that you have permission to work on. Otherwise, you will receive a permission error. For example, on a Linux system, you may be restricted on which folder you can write to. 
+
+The value in single quotes that follows the **To** keyword is the absolute path to the output file. The format of the path will depend on the operating system you are using. On Linux and Mac, the directory separator would be a forward-slash (/) character, and the root of the main drive would be /. On windows, however, the directory separator would be a back-slash (\) character and the path would start with the drive letter.
+
+### \COPY with psql
+ The **COPY** command, as stated above, runs on the PostgreSQL server. The PostgreSQL server is installed on your local machine. So, your local machine is the server, and the **COPY** command will save the
+file to your local paths. However, in a real-world setup, servers are highly protected. Users usually do not have access to the file system of the server machines and need to download the files to their local machines.
+
+The terminal **psql** allows the **COPY** command to be called remotely using the **psql**-specific **\COPY** instruction, which is similar in syntax to the **COPY** command but saves the file to the local machine. Once you have connected to your database using **psql**, you can test out the **\COPY** instruction by using the following command:
+```
+\COPY (
+SELECT *
+FROM customers
+LIMIT 5
+)
+TO 'c:\Users\Public\my_file.csv'
+WITH CSV HEADER;
+```
+The following is the output of the code:
+```
+COPY 5
+```
+Here is a breakdown of this command and the parameters that were passed in:
+- **\COPY** invokes the PostgreSQL **COPY** command to output the data.
+- **(SELECT * FROM customers LIMIT 5)** is the query that you want to copy the result from.
+- **TO 'c:\Users\Public\my_file.csv'** indicates that **psql** should save the output from standard output into **c:\Users\Public\my_file.csv**. Note that the **\COPY** command allows both absolute paths and relative paths. However, as there are many possible setups, this text will only use the absolute path, **c:\Users\Public**, for data files.
+- The **WITH CSV HEADER** parameters operate in the same way as before.
+
+You can also look at **my_file.csv**, which you can open with the text editor of your choice, such as Notepad:
+![The CSV file that you created using your \COPY command!](images/myfile.png)
+It is worth noting here that while you can split the text of the **COPY** command into multiple lines, the **\COPY** command does not allow the query to contain multiple lines. A simple way to leverage multiline queries is to create a view containing your data before the **\COPY** command and drop the view after your **\COPY** command has finished. You will learn how to create a view in the next section.
+
+## Creating Temporary Views
+In many cases, you will find a certain query particularly helpful and would like to keep the definition so that you can use it later. Previously, you have learned about the usage of subqueries as well as common table expressions. As useful as they are, subqueries and common table expressions are only effective within a single SQL query. You cannot refer to them outside their main query. To save a query definition for future usage, PostgreSQL allows you to create a view, which is a named **SELECT** query that you can reference later.
+
+You can create a **VIEW** command called **customers_sample** using the following syntax:
+```
+CREATE TEMP VIEW customers_sample AS (
+   SELECT
+      *
+FROM
+   customers
+LIMIT
+   12
+);
+```
+PostgreSQL will give you the following message, letting you know that the view has been created successfully:
+![Output of the CREATE VIEW statement!](images/CREATEVIEW.png)
+In this example, the SQL statement of this query is stored in a temporary view, which can be referenced in a similar way to the syntax used to reference a table. For example, look at the following query:
+```
+SELECT
+   COUNT(1)
+FROM
+   customers_sample;
+```
+This would output **12**
+
+A view is a named SQL query and does not save any data. Instead, every time the view is referenced in a query, SQL replaces the view name with the query defined in the view, similar to handling a subquery. Views
+are saved in the schema until explicitly dropped. However, you can also add a **TEMP** keyword to instruct SQL to remove the view automatically once you are logged out of the server. 
+
+You can also manually delete the view using a simple command:
+```
+DROP VIEW customers_sample;
+```
+
+For example, consider these commands:
+```
+CREATE TEMP VIEW customers_sample AS (
+SELECT
+*
+FROM
+customers
+LIMIT
+5
+);
+\COPY (SELECT * FROM customers_sample) TO 'c:\Users\Public\my_file.csv'
+WITH CSV HEADER
+DROP VIEW customers_sample;
+```
+The output of this would be identical to the output in the first export example. While you can perform this action either way, for readability, you will use the latter format in this article for longer queries.
+
+## Configuring COPY and \COPY
+There are several options that you can use to configure the **COPY** and **\COPY** commands:
+- **FORMAT: format_name** can be used to specify the format. The options for **format_name** are **csv**, **text**, or **binary**. Alternatively, you can simply specify **CSV** or **BINARY** without the **FORMAT** keyword, or not specify the format at all and let the output default to a text file format.
+- **DELIMITER: delimiter_character** can be used to specify the delimiter character for CSV or
+text files (for example, for CSV files, or | for pipe-separated files).
+- **NULL: null_string** can be used to specify how **NULL** values should be represented (for example,whether blanks represent **NULL** values or **NULL** if that is how missing values should be represented in the data).
+- **HEADER**: This specifies that the header should be output.
+- **QUOTE: quote_character** can be used to specify how fields with special characters (for example, a comma in a text value within a CSV file) can be wrapped in quotes so that they are ignored by **COPY**.
+- **ESCAPE: escape_character** specifies the character that can be used to escape the following character.
+- **ENCODING: encoding_name** allows the specification of the encoding, which is particularly useful when you are dealing with foreign languages that contain special characters or user input.
+
+For example, running from **psql**, the following would create a pipe-separated file, with a header, with empty (0 lengths) strings to represent a missing (**NULL**) value, and the double quote (") character to represent the quote character:
+```
+\COPY customers TO 'c:\Users\Public\my_file.csv' WITH CSV HEADER
+DELIMITER '|' NULL '' QUOTE '"'
+```
+The following is the output of the code:
+```
+COPY 50000
+```
+
+
+### Using COPY and \COPY to Bulk Upload Data to your database
+The **COPY** and **\COPY** commands can be used to efficiently download data, but they can also be used to upload data. The **COPY** and **\COPY** commands are far more efficient at uploading data than an **INSERT** statement. There are a few reasons for this:
+- When using **COPY**, there is only one push of a data block, which occurs after all the rows have been properly allocated.
+- There is less communication between the database and the client, so there is less network latency.
+- PostgreSQL includes optimizations for **COPY** that would not be available through **INSERT**.
+
+Here is an example of using the **\COPY** command to copy rows into a table from a file. First, run the following SQL to create a new table for **\COPY** command testing:
+```
+CREATE TABLE customers_csv AS (
+SELECT * FROM customers LIMIT 1
+);
+```
+Then, run the following **\COPY** command to test its data loading functionality:
+```
+\COPY customers_csv FROM 'c:\Users\Public\my_file.csv' CSV HEADER
+DELIMITER '|'
+```
+This outputs the following:
+```
+COPY 50000
+```
+Here is a breakdown of this command and the parameters that were passed in:
+- **\COPY** is invoking the PostgreSQL **COPY** command to load the data into the database.
+- **customers_csv** is the name of the table that you want to append to.
+- **FROM 'c:\Users\Public\my_file.csv** specifies that you are uploading records from **c:\Users\Public\my_ file.csv**. The **FROM** keyword specifies that you are uploading records, as opposed to the **TO** keyword, which you use to download records. 
+- The **WITH CSV HEADER** parameters operate the same as before.
+- **DELIMITER '|'** specifies what the delimiter is in the file. For a CSV file, this is assumed to be a comma, so you do not need this parameter. However, for readability, it might be useful to explicitly
+define this parameter, if for no other reason than to remind yourself how the file has been formatted.
+
+While **COPY** and **\COPY** are great for exporting data to other tools, there is additional functionality in PostgreSQL for exporting a database backup.
+
+For these maintenance tasks, you can use **pg_dump** for a specific table and **pg_dumpall** for an entire database or schema. These commands even let you save data in a compressed (**tar**) format, which saves space. Unfortunately, the output format from these commands is typically SQL, and it cannot be readily consumed outside of PostgreSQL. Therefore, it does not help you with importing or exporting data to and from other analytics tools, such as Python.
+
+#### Exporting Data to a File for Further Processing in Excel
+The ZoomZoom executive committee is busy scouting for new locations to open their next dealership. Since the presentation needs to be made in PowerPoint, you can use Microsoft Excel to generate a bar chart of
+customer numbers per city based on the **.csv** file. Then, you can simply copy that chart to your slide. As a data analyst, you will be helping them make this decision by presenting the data in **.csv** file format about the cities that have the highest number of customers. The data will need to be retrieved from the **customers** table of the **sqlda** database. The **psql** and **\COPY** commands you learned about will come in handy. This analysis will help the ZoomZoom executive committee to decide where they might want to open the next dealership.
+
+1. Open the command line to implement this exercise (such as CMD for Windows or Terminal for Mac) and connect to the **sqlda** database using the **psql** command.
+![Running psql from the command line with parameters!](images/ps.png)
+Once this command is executed, the command terminal will look like this:
+![The psql interface after being launched from the command line!](images/psqlda.jpg)
+2. Create the **top_cities** view. The view will be defined as **SELECT city, count(1) AS number_of_customers …,** which gives you the number of customers for each city. Because you add the **LIMIT 10** statement, you only grab the top 10 cities, as ordered by the second column (the
+number of customers). You also filter out the customers without a city:
+```
+CREATE TEMP VIEW top_cities AS (
+    SELECT
+        city,
+        count(1) AS number_of_customers
+    FROM
+        customers
+    WHERE
+        city IS NOT NULL
+    GROUP BY
+        1
+    ORDER BY
+        2 DESC
+    LIMIT
+        10
+);
+```
+3. Copy the **top_cities** view from your **ZoomZoom** database to a local file in **.csv** format. You do this by utilizing the temporary view you just created using the following command. Please note that
+the OS-specific path needs to be prepended to the **top_cities.csv** filename to specify the location to save the file. Here, in a windows environment, you will use **c:\Users\Public** as the folder:
+```
+\COPY (SELECT * FROM top_cities) TO 'c:\Users\Public\top_cities.csv'
+WITH CSV HEADER DELIMITER ','
+```
+4. Drop the view:
+```
+DROP VIEW top_cities;
+```
+Here is a breakdown of these statements:
+**CREATE TEMP VIEW top_cities AS (…)** indicates that you are creating a new temporary view.
+**\COPY …** copies data from this view to the **top_cities.csv** file on your local computer.
+**DROP VIEW top_cities**; deletes the view because you no longer need it.
+If you open the **top_cities.csv** text file, you should see the following output:
+![Output from the \COPY command!](images/outcopy.png)
+
+**Note**
+Here, the output file is **top_cities.csv**. You will be using this file in the upcoming exercises in this text.
+
+Now that you have the output from your database in **CSV** file format, you can open it with a spreadsheet program, such as Excel.
+
+5. Using Microsoft Excel or your favorite spreadsheet software or text editor, open the **top_cities.csv** file:
+![The top_cities.csv file open in Excel!](images/excel.png)
+6. Next, select all the data, which in this case is from cell A1 to cell B11:
+![Select the entire dataset by clicking and dragging from cell A1 to cell B11!](images/select.png)
+7. Next, in the top menu, go to Insert and then click on the bar chart icon (chart:) to create a 2-D Column
+![Insert a bar chart to visualize the selected data!](images/barcha.png)
+8. Finally, you should end up with the following output:
+![number of customers!](images/barachart.png) 
+You can see from this chart that Washington D.C. has a very high number of customers. Based on this simple analysis, Washington D.C. would probably be the obvious next target for ZoomZoom expansion.
+
+## Using Python with your Database
+While SQL has a breadth of functionality, many data scientists and data analysts are starting to use Python too. This is because Python is a high-level language that can be easily used to process data. While the
+functionality of SQL covers most of the daily needs of data scientists, Python is growing fast and has generally become one of the most important data analytics tools in recent polls. A lot of Python's
+functionality is also fast, in part because so much of it is written in C, a low-level programming language.
+
+The other large advantage that Python has is that it is versatile. While SQL is generally only used in the data science and statistical analysis communities, Python can be used to do anything from statistical analysis to building a web application. As a result, the developer community is much larger for Python. A larger developer community is a big advantage because there is better community support (for example, on Stack Overflow), and more Python packages and modules are being developed every day. The last major benefit of Python is that as it is a general programming language, it can be easier to deploy Python code to a production environment, and certain controls (such as Python namespaces) make Python less susceptible to errors. As a result of these advantages, it might be useful to learn Python as a data scientist.
+
+### Getting started with python
+You have been running SQL against the PostgreSQL server and obtaining results via client software such as **pgAdmin** and psql throughout this article. PostgreSQL DBMS, as well as other relational DBMSs, allows for
+many ways of client connection. You can run your SQL through any of these connection methods and retrieve data in the same way as with **pgAdmin** and **psql**. When you use Python for data analytics, you
+will use a specific Python library called **psycopg2**. This library, when called from a Python runtime environment, will connect to the PostgreSQL server and handle traffic between your Python script and the
+database server. In its simplest form, once you connect to the PostgreSQL server using **psycopg2**, you can submit SQL to the database using Python scripts, the same way that you would with **psql**.
+
+While there are many ways to get access to Python, the Anaconda distribution of Python makes it particularly easy to obtain and install Python and other analytical tools, as it comes with many commonly
+used analytics packages preinstalled alongside a great package manager. For that reason, you will be using the Anaconda distribution in this article. 
+
+You can take the following steps to get set up using the Anaconda distribution and to connect to Postgres:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
