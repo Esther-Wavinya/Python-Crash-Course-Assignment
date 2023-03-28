@@ -2756,17 +2756,136 @@ While there are many ways to get access to Python, the Anaconda distribution of 
 used analytics packages preinstalled alongside a great package manager. For that reason, you will be using the Anaconda distribution in this article. 
 
 You can take the following steps to get set up using the Anaconda distribution and to connect to Postgres:
+1. Download and install [Anaconda:](https://www.anaconda.com/distribution/). During the installation, make sure that the **Add Anaconda to PATH** option is selected.
+2. Once you have gone through the installation steps, open the Anaconda Prompt for Mac/Windows. Type python into the command line and check that you can access the Python interpreter, which should look like this:
+![The Python interpreter is now available and ready for input!](images/ana.jpg)
 
+If you get an error, it may be because you need to specify your Python path. You can enter **quit()** to exit.
 
+3. Next, download and install the PostgreSQL database client for Python, **psycopg2**, using the Anaconda package manager. Open Anaconda Navigator for Mac/Windows. In the left panel, choose the **Environments** tab. Then, in the first drop-down box of the right panel, choose **All**.
+![Checking the psycopg2 installation status!](images/psyc.png)
+Type **psy** in the search box. You will see a list of libraries, including **psycopg2**. If it is not installed yet (that is, the box in front of it is not checked), check the box and click on the **Apply** button in the bottom-right corner. Follow the instructions for installation.
+![Installation checkbox for psycopg2!](images/ins.png)
 
+4. You can use Python in notebook form in your web browser. This is useful for displaying visualizations and running exploratory analyses. In this text, you are going to use Jupyter Notebook, which was
+installed as part of the Anaconda installation. From the **Home** tab of Anaconda Navigator, find Jupyter Notebook and click on **Launch**. You should see something like this pop up in your default browser:
+![The Jupyter Notebook pop-up screen in your browser!](images/jupyter.png)
 
+5. Next, you will create a new notebook by clicking the **New** drop-down button and choosing **Python 3 (ipykernel)**:
+![Opening a new Python 3 Jupyter notebook!](images/ipy.png)
+You now have a notebook. Each notebook consists of multiple cells. Each cell contains some Python statements that will be executed together as one step.
+![A new Jupyter notebook!](images/note.png)
+6. Start writing the following Python script to import **psycopg2** into your Python runtime by typing it in the cell and clicking on the Run button above:
+```
+import psycopg2
+```
+7. As you finish running one cell, a new cell is created. Type the following code in the new cell and click on the **Run** button. This statement establishes the connection from your Python program (which is a
+client) to the database server specified in the parameters:
+```
+conn = psycopg2.connect(
+host="localhost",
+user="postgres",
+password="my_password",
+dbname="sqlda",
+port=5432
+)
+```
+8. Type the following script in the new cell that is automatically generated and click **Run**. This code creates a Python cursor that can send SQL statements to the database server and retrieve results:
+```
+cur = conn.cursor()
+```
+9. Now you can execute a sample SQL statement from the cursor by using its **execute()** method:
+```
+cur.execute("SELECT * FROM customers LIMIT 5")
+```
+10.  Finally, you can retrieve the result and display it:
+```
+records = cur.fetchall()
+print(records)
+```
 
+The following screenshot displays the output:
+![The output from your database connection in Python!](images/pyt.png)
 
+You may wonder how this is different from running the same SQL from **pgAdmin**. After all, while you were able to connect to the database and read the data, several steps were required, and the syntax was a little bit more complex than for some of the other approaches you have tried. The power of Python in data analytics, as well as other programming languages, lies in the fact that inside a Python program, you can directly process the data, which is generally faster and has more functionalities. In the next section, you will learn how to use some of the other packages in Python to facilitate interfacing with the database.
 
+### Improving PostgreSQL Access in Python with SQLAlchemy and pandas
+While **psycopg2** is a powerful database client for accessing PostgreSQL from Python, it is just a connector. It does nothing more than passing the SQL and the resulting data between your program and the
+database server. There are more things in Python that can help the data analytics process. You can enhance the code by using a couple of other packages—namely, **pandas** and **SQLAlchemy**. First, you will learn
+about **SQLAlchemy**, a Python SQL toolkit that maps representations of objects to database tables. You will get familiar with the **SQLAlchemy** database engine and some of the advantages that it offers. This will enable you to access a database seamlessly without worrying about connections and Python objects. Next, you will learn about **pandas**—a Python package that can perform data manipulation and facilitate data analysis.
 
+The **pandas** package will help you represent your data table structure (called a DataFrame) in memory. pandas also has high-level APIs that will enable you to read data from a database in just a few lines of code.
 
+While both packages are powerful, it is worth noting that they still use the **psycopg2** package to connect to the database and execute queries. The big advantage that these packages provide is that they abstract some of the complexities of connecting to the database. By abstracting these complexities, you can connect to the database without worrying that you might forget to close a connection or remove a Python object such as a
+cursor.
 
+#### What is SQLAlchemy?
+**SQLAlchemy** is a Python SQL toolkit and **Object-Relational Mapper (ORM)** that maps representations of objects to database tables. An ORM builds up mappings between SQL tables and programming language
+objects; in this case, Python objects. For example, in the following figure, there is a **customer** table in the database. The Python ORM will thus create a class called **customer** and keep the content in the object synchronized with the data in the table. For each row in the **customer** table, a **customer** object will be created inside the Python runtime. When there are changes (inserts, updates, and/or deletes), the ORM can initialize a sync and make the two sides consistent.
+![An ORM maps rows in a database to objects in memory!](images/ORM.png)
+While the **SQLAlchemy ORM** offers many great functionalities, its key benefit is the **Engine** object. A **SQLAlchemy Engine** object contains information about the type of database (in your case, PostgreSQL) and a connection pool. The connection pool allows multiple connections to the database that operate simultaneously. The connection pool is also beneficial because it does not create a connection until a query is sent to be executed. Because these connections are not formed until the query is executed, the **Engine** object is said to exhibit lazy initialization. The term "lazy" is used to indicate that nothing happens (the connection is not formed) until a request is made. This is advantageous because it minimizes the time it takes for Python to establish and maintain the connection and reduces the load on the database.
 
+Another advantage of the **SQLAlchemy Engine** object is that it automatically commits changes to the database due to **CREATE TABLE, UPDATE, INSERT**, and other statements that modify a database. This
+will help the data in the database and the data in Python to be synchronized all the time.
+
+In your case, you will want to use it because it provides a robust **Engine** object to access databases. If the connection is dropped, the **SQLAlchemy Engine** object can instantiate that connection because it has a connection pool. It also provides a nice interface that works well with other packages (such as **pandas**).
+
+#### Using Python with SQLAlchemy and pandas
+Normally, **SQLAlchemy** and **pandas** come together with Anaconda. When you install Anaconda on your machine, you have already set them up. However, if you are not sure about the installation, you can open
+later in this text, such as **matplotlib**, if necessary.
+
+Now, open Anaconda Navigator if you have not done so. Launch Jupyter Notebook and create a new notebook. Enter the following import statements in the first cell:
+```
+from sqlalchemy import create_engine
+import pandas as pd
+```
+You will notice that you are importing two packages here. The first is the **create_engine** module within the **sqlalchemy** package, and the second is **pandas**, which you rename to **pd** following the standard
+convention (and it has fewer characters). Using these two packages, you will be able to read and write data to and from your database and visualize the output.
+
+Hit the **run** button or press Shift + Enter to run these commands. A new active cell should pop up:
+![Running your first cell in the Jupyter notebook!](images/cell.png)
+Next, you will configure your notebook to display plots and visualizations inline. You can do this with the following command:
+```
+%matplotlib inline
+```
+This tells the **matplotlib** package (which is a dependency of **pandas**) to create plots and visualizations inline in your notebook. Hit Shift + Enter again to jump to the next cell.
+
+In the new cell, you will define your connection string:
+```
+cnxn_string = (
+  "postgresql+psycopg2://{username}:{pswd}@{host}:{port}/{database}"
+)
+print(cnxn_string)
+```
+Press Shift + Enter again, and you should now see this connection string was printed. This is a generic connection string for **psycopg2**. You need to fill in your parameters to create the database **Engine** object.
+You can replace the parameters using the parameters that are specific to your connection. The particular parameters corresponding to the setup of this article are as follows:
+```
+engine = create_engine(
+cnxn_string.format(
+username="postgres",
+pswd="reuben80kihiu",
+host="localhost",
+port=5432,
+database="sqlda"
+)
+)
+```
+In this command, you run **create_engine** to create your database **Engine** object. You pass in your connection string and you format it for your specific database connection by filling in the placeholders for
+**{username}, {pswd}, {host}, {port}, and {database}**. The host is either an IP address, domain name, or the word localhost if the database is hosted locally. Make sure you update the password to match your setup.
+
+Because **SQLAlchemy** is lazy, you will not know whether your database connection was successful until you try to send a command. You can test whether this database **Engine** object works by running the following command and hitting Shift + Enter:
+```
+engine.execute("SELECT * FROM customers LIMIT 2;").fetchall()
+```
+You should see something like this:
+![Executing a query within Python!](images/sqlalchemy.png)
+The output of this command is a Python list containing rows from your database as tuples. While you have successfully read data from your database, you will probably find it more practical to read your data into a **pandas** DataFrame in the next section.
+
+#### Reading and Writing to a Database with pandas
+Python comes with great data structures, including lists, dictionaries, and tuples. While these are useful, your data can often be represented in table form, with rows and columns, similar to how you would store data in your database. For these purposes, the **DataFrame** object in **pandas** can be particularly useful. In addition to providing powerful data structures, **pandas** also offers the following:
+- Functionality to read data directly from a database
+- Data visualization
+- Data analysis tools
 
 
 
