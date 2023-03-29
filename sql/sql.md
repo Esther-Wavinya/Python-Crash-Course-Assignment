@@ -2535,7 +2535,7 @@ SELECT *
 FROM customers
 LIMIT 5
 )
-TO 'c:\Users\Public\my_file.csv'
+TO '~/Documents/Python-Crash-Course-Assignment/sql/my_file.csv'
 WITH CSV HEADER;
 ```
 The output will be the following:
@@ -2559,7 +2559,7 @@ SELECT *
 FROM customers
 LIMIT 5
 )
-TO 'c:\Users\Public\my_file.csv'
+TO '~/Documents/Python-Crash-Course-Assignment/sql/my_file.csv'
 WITH CSV HEADER;
 ```
 The following is the output of the code:
@@ -2619,7 +2619,7 @@ customers
 LIMIT
 5
 );
-\COPY (SELECT * FROM customers_sample) TO 'c:\Users\Public\my_file.csv'
+\COPY (SELECT * FROM customers_sample) TO '~/Documents/Python-Crash-Course-Assignment/sql/my_file.csv'
 WITH CSV HEADER
 DROP VIEW customers_sample;
 ```
@@ -2638,7 +2638,7 @@ text files (for example, for CSV files, or | for pipe-separated files).
 
 For example, running from **psql**, the following would create a pipe-separated file, with a header, with empty (0 lengths) strings to represent a missing (**NULL**) value, and the double quote (") character to represent the quote character:
 ```
-\COPY customers TO 'c:\Users\Public\my_file.csv' WITH CSV HEADER
+\COPY customers TO '~/Documents/Python-Crash-Course-Assignment/sql/my_file.csv' WITH CSV HEADER
 DELIMITER '|' NULL '' QUOTE '"'
 ```
 The following is the output of the code:
@@ -2661,7 +2661,7 @@ SELECT * FROM customers LIMIT 1
 ```
 Then, run the following **\COPY** command to test its data loading functionality:
 ```
-\COPY customers_csv FROM 'c:\Users\Public\my_file.csv' CSV HEADER
+\COPY customers_csv FROM '~/Documents/Python-Crash-Course-Assignment/sql/my_file.csv' CSV HEADER
 DELIMITER '|'
 ```
 This outputs the following:
@@ -2710,7 +2710,7 @@ CREATE TEMP VIEW top_cities AS (
 3. Copy the **top_cities** view from your **ZoomZoom** database to a local file in **.csv** format. You do this by utilizing the temporary view you just created using the following command. Please note that
 the OS-specific path needs to be prepended to the **top_cities.csv** filename to specify the location to save the file. Here, in a windows environment, you will use **c:\Users\Public** as the folder:
 ```
-\COPY (SELECT * FROM top_cities) TO 'c:\Users\Public\top_cities.csv'
+\COPY (SELECT * FROM top_cities) TO '~/Documents/Python-Crash-Course-Assignment/sql/top_cities.csv'
 WITH CSV HEADER DELIMITER ','
 ```
 4. Drop the view:
@@ -2877,6 +2877,10 @@ Because **SQLAlchemy** is lazy, you will not know whether your database connecti
 ```
 engine.execute("SELECT * FROM customers LIMIT 2;").fetchall()
 ```
+In case you get an attribute error, downgrade the sqlalchemy version using:
+```
+pip install --force-reinstall 'sqlalchemy<2.0.0'
+```
 You should see something like this:
 ![Executing a query within Python!](images/sqlalchemy.png)
 The output of this command is a Python list containing rows from your database as tuples. While you have successfully read data from your database, you will probably find it more practical to read your data into a **pandas** DataFrame in the next section.
@@ -2886,6 +2890,788 @@ Python comes with great data structures, including lists, dictionaries, and tupl
 - Functionality to read data directly from a database
 - Data visualization
 - Data analysis tools
+If you continue from where you left off with your Jupyter notebook, you can use the SQLAlchemy **Engine** object to read data into a pandas DataFrame:
+```
+customers_data = pd.read_sql_table('customers', engine)
+```
+
+You have now stored your entire **customers** table as a **pandas** DataFrame in the **customers_data** variable. The **pandas read_sql_table** function requires two parameters: the name of a table and the connectable database (in this case, the **SQLAlchemy Engine** object). Alternatively, you can use the **read_sql_query** function, which takes a query string instead of a table name.
+
+Here is an example of what your notebook might look like at this point:
+![The entirety of your Jupyter notebook!](images/notebo.png)
+
+Now that you know how to read data from the database, you can start to do some basic analysis and visualization. In essence, a **pandas** DataFrame is a relational table with enhanced information. You can
+apply similar operations in SQL on the DataFrames, such as querying, inserting, filtering, and deleting. For example, the **head()** method returns the first few (default of 5) rows of the DataFrame, much like the
+**LIMIT** clause in SQL. Then, in addition, you can also perform many more operations, such as pivoting, multi-column search and replacement, and semi-structured data parsing, which are not possible or are very
+difficult to achieve using SQL. For example, the **min()/max()** methods will return the minimum/maximum values of every column, without the need to specify the column name. The full functionalities of **pandas** are beyond the scope of this text, but will demonstrate some basic ones in the coming exercises.
+
+##### Writing Data to the Database using Python
+There will always be scenarios in which you will want to use Python to write data back to the database. Luckily for you, **pandas** and **SQLAlchemy** make this a relatively easy task.
+
+If you have your data in a **pandas** DataFrame, you can write data back to the database using the **pandas to_sql(…)** function, which requires two parameters: the name of the table to write to and the connection.
+Best of all, the **to_sql(…)** function can also create the target table for you by inferring column types using a DataFrame's data types. In the coming exercise, you will test out this functionality using the **top_cities_data** DataFrame that you created in Step 8.
+
+Now, implement an exercise to read, visualize, and save data using Python.
+**Reading, Visualizing, and Saving Data in Python**
+In the previous exercise, you executed a SQL query to get a list of the cities that have the highest number of customers. Then you dumped the result into a **CSV** file using the **COPY** command and sent the file to the business department. Upon receiving the file, they created a visualization on top of the **CSV** file in Excel and copied and pasted the visualization into a Microsoft PowerPoint slide file for presentation.
+
+Looking at this process, you can see that there is still a lot of manual work and coordination between different applications. The whole process involves three applications: psql, Excel, and PowerPoint. There is a
+**.csv** file passing between psql and Excel, and there are copy and paste activities between Excel and PowerPoint.
+
+In this exercise, you will analyze the same demographic information of customers by their city to better understand the target audience by reading data from the database output and visualizing the results using
+Python with Jupyter notebooks, SQLAlchemy, and **pandas**. You will run the SQL inside Python, retrieve data in a **pandas** DataFrame, and create a visualization inside Jupyter Notebook.
+
+All this is automated and there are no other applications involved. There will not be a need to pass files and clipboards between applications. The following steps are involved:
+1. Open Anaconda Navigator and launch Jupyter Notebook. Create a new notebook.
+2. Run the following code in the first cell. The code imports required libraries into the Python runtime:
+```
+from sqlalchemy import create_engine
+import pandas as pd
+```
+3. The second cell sets up the **matplotlib** environment for drawing. Matplotlib is a Python library that is widely used for data visualization, that is, drawing charts based on data. It comes together with **pandas** and should have already been installed in your environment. Running this command allows **matplotlib** to output the visualization directly to Jupyter Notebook:
+```
+%matplotlib inline
+```
+4. The third cell establishes a connection to the database server. You will need to adjust this code based on your server's setup:
+```
+cnxn_string = (
+     "postgresql+psycopg2://{username}:{pswd}@{host}:
+{port}/{database}"
+)
+engine = create_engine(
+    cnxn_string.format(
+        username="postgres",
+        pswd="reuben80kihiu",
+        host="localhost",
+        port=5432,
+        database="sqlda"
+    )
+)
+```
+5. Enter the following query surrounded by triple quotes (triple quotes allow strings that span multiple lines in Python):
+```
+query = """
+   SELECT
+     city,
+     COUNT(1) AS number_of_customers,
+     COUNT(NULLIF(gender, 'M')) AS female,
+     COUNT(NULLIF(gender, 'F')) AS male
+   FROM
+     customers
+   WHERE
+     city IS NOT NULL
+   GROUP BY
+     1
+   ORDER BY
+     2 DESC
+   LIMIT
+     10
+"""
+```
+For each city, this query calculates the count of customers and calculates the count for each gender. It also removes customers with missing city information and aggregates your customer data by the first column (the city). In addition to this, it sorts the data by the second column (the count of customers) from largest to smallest (descending). Then, it limits the output to the top 10 (that is, the 10 cities with the highest number of customers).
+
+6. Read the query result into a **pandas** DataFrame with the following command and execute the cells using Shift + Enter:
+```
+top_cities_data = pd.read_sql_query(query, engine)
+```
+The **pandas read_sql_query** method will run a SQL query against the database server that the engine points to and return the result in a **pandas** DataFrame. Here, **top_cities_data** is the DataFrame that
+**pandas** returned. View the data of **top_cities_data** by entering this name in a new cell and simply hitting Shift + Enter. Just as with the Python interpreter, Jupyter Notebook will display the output value:
+![Storing the result of a query as a pandas DataFrame!](images/pan.png)
+You will notice that **pandas** also numbers the rows by default. In **pandas**, this is called an index.
+7. Now, plot the number of men and women in each of the top 10 cities. To view the stats for each city separately, you can use a simple bar plot:
+```
+ax = top_cities_data.plot.bar(
+  'city',
+   y=['female', 'male'],
+   title='Number of Customers by Gender and City'
+)
+```
+The **plot()** method of the **pandas** DataFrame will draw a chart in the notebook. The chart type depends on the submethod that the **plot()** method uses. The **bar()** method will draw a bar chart. You can also
+choose other visualization types such as a pie chart (**pie()**), line chart (**line()**), and scatter plot(**scatter()**). Here is a screenshot of what your resulting output notebook should look like:
+![Data visualization in the Jupyter notebook!](images/datavis.png)
+The results show that there is no significant difference in the gender of your customers in the cities that you are considering expanding into.
+8. Now, use the following command to save the DataFrame into a database table:
+```
+top_cities_data.to_sql(
+    'top_cities_data',
+     engine,
+     index=False,
+     if_exists='replace'
+)
+```
+In addition to the two required parameters, you added two optional parameters to this function. The **index** parameter specifies whether you want the index to be a column in your database table as well (a value of **False** means that you will not include it), and the **if_exists** parameter allows you to specify how to handle a scenario in which there is already a table with the same name in the database. In this case, you want to drop that table and replace it with the new data, so you use the **'replace'** option. In general, you should exercise caution when using the **'replace'** option as you can inadvertently lose your existing data.
+9. You can utilize the data using SQL as it is currently saved in the database. You can query this data from any database client, including **pgAdmin**. For example, in the following SQL, you examine the
+relationship between the number of customers and the sales:
+```
+SELECT
+  t.city,
+  t.number_of_customers,
+  SUM(s.sales_amount)
+FROM
+  sales s
+JOIN
+  customers c
+  ON s.customer_id = c.customer_id
+JOIN
+  top_cities_data t
+  ON c.city = t.city
+GROUP BY
+  1, 2
+ORDER BY
+  2 DESC;
+```
+```
+SELECT
+top_cities_data.city,
+top_cities_data.number_of_customers,
+SUM(sales.sales_amount)
+FROM
+sales
+JOIN
+customers
+ON sales.customer_id = customers.customer_id
+JOIN
+top_cities_data
+ON customers.city = top_cities_data.city
+GROUP BY
+1, 2
+ORDER BY
+2 DESC;
+```
+
+The following is the output of the code:
+![Data created in Python that has now been imported into your database!](images/im.png)
+
+In this exercise, you were able to read data from your database programmatically and perform data visualization on the result.
+
+While the **to_sql()** functionality is simple and works as intended, it uses **insert** statements to send data to the database. For a small table of 10 rows, this is fine; however, for larger tables, the **psql \COPY** command is going to be much faster. Next, you will look at how you can write data (such as results from statistical analysis) back to the database using **COPY**.
+
+##### Improving Python Write Speed with COPY
+You can use the **COPY** command in conjunction with Python, **SQLAlchemy**, and **pandas** to deliver the same speed that you get with the **COPY** command in psql. For instance, say you define the following function:
+```
+import csv
+from io import StringIO
+def psql_insert_COPY(table, conn, key, data_iter):
+# gets a DBAPI connection that can provide a cursor
+    dbapi_conn = conn.connection
+    with dbapi_conn.cursor() as cur:
+        s_buf = StringIO()
+        writer = csv.writer(s_buf)
+        s_buf.seek(0)
+        writer.writerows(data_iter)
+        columns = ', '.join('"{}"'.format(k) for k in keys)
+    if table.Schema:
+        table_name = '{}.{}'.format(table.schema, table.name)
+    else:
+        table_name = table.name
+        sql = 'COPY {} ({}) FROM STDIN WITH CSV'.format(table_name, columns)
+        cur.COPY_expert(sql=sql, files=s_buf)
+```
+![Python code for importing data using COPY!](images/imco.png)
+You can then leverage the **method** parameter in **to_sql**, as shown here:
+```
+top_cities_data.to_sql(
+'top_cities_data',
+engine,
+index=False,
+if_exists='replace',
+method=psql_insert_COPY
+)
+```
+The **psql_insert_COPY** function defined here can be used without modifications to any of your PostgreSQL imports from **pandas**. Here is a breakdown of what this code does:
+1. After performing some necessary imports, you begin by defining the function using the **def** keyword followed by the function name (**psql_insert_COPY**) and the parameters (**table, conn, keys,
+and data_iter**).
+2. Next, you establish a connection (**dbapi_conn**) and a cursor (**cur**) that you can use for execution.
+3. Next, you write all the data in your rows (represented by **data_iter**) to a string buffer (**s_buf**), which is formatted like a **CSV** file, but exists in memory and not in a file on your hard drive.
+4. Then, you define the column names (**columns**) and the table name (**table_name**).
+5. Lastly, you execute the **COPY** statement by streaming the **CSV** file contents through **standard input (STDIN)**.
+   
+While it is helpful to read and write directly from the database, or import data into the database from a file, sometimes you will want to read a file into Python for preprocessing before the data is sent to your database (for example, if the file contains errors and cannot be read directly by the database or if the file requires additional analytics to be appended to it). In these instances, you can leverage Python to read and write **CSV** files.
+
+###### Reading and Writing CSV Files with Python
+Until now, you have covered the usage of Python in conjunction with SQL. However, Python can also process data in other ways.
+
+In addition to reading and writing data to your database, you can use Python to read and write data from your local file system. The commands for reading and writing **CSV** files with **pandas** are very similar to those used for reading and writing from your database:
+
+- For writing, **pandas.DataFrame.to_csv(file_path, index=False)** would write the DataFrame to your local file system using the supplied **file_ path** parameter. **DataFrame** is a property of **pandas** that temporarily stores data. The **to_ csv()** method of DataFrame has the
+following parameters: **file_path**, which is a string representing the path to the output file in a format specific to the OS, and **index**, which, if set to **true**, will write row numbers into the output
+data.
+- For reading, **pandas.read_csv(file_path, dtype={})** would return a DataFrame representation of the data supplied in the CSV file located at the **file_path**.
+  
+When reading a **CSV** file, **pandas** will infer the correct data type based on the values in the file. For example, if the column contains only integer numbers, it will create the column with an int64 data type.
+
+Similarly, it can infer whether a column contains floats, timestamps, or strings. **pandas** can also infer whether there is a header for the file, and generally, this functionality works well. If there is a column that is not read incorrectly (for example, a five-digit US zip code might be read in as an integer causing the leading zeros to fall off, meaning "07123" would become "7123" without the leading zeros), you can specify the column type directly using the **dtype** parameter. For example, if you have a **zip_code** column in your dataset, you could specify that it is a string using **dtype={'zip_code': str}**.
+
+**Note**
+There are many ways in which a **.csv** file might be formatted. While **pandas** can generally infer the correct header and data types, many parameters are provided to customize the reading and writing of a **.csv** file for your needs.
+
+Using the **top_cities_data** dataset in your notebook, you can test out this functionality:
+```
+top_cities_data.to_csv(
+'c:\\Users\\Public\\top_cities_analysis.csv',
+index=False
+)
+my_data = pd.read_csv(
+'c:\\Users\\Public\\top_cities_analysis.csv'
+)
+my_data
+```
+**my_data** now contains the data that you wrote to a **CSV** file and then read back in. You do not need to specify the optional **dtype** parameter in this case because your columns could be inferred correctly using **pandas**. You should see an identical copy of the data that is in **top_cities_data**:
+![Checking that you can write and read CSV files in pandas!](images/csv.png)
+In this example, you were able to read and write a **CSV** file from Python using data you queried from your database. With these skills, you can now import and export data between a file and your database, between
+Python and your database, and between Python and a file.
+
+
+##### Best Practices for Importing and Exporting Data
+At this point, you have seen several different methods for reading and writing data between your computer and your database. Each method has its own use case and purpose. Generally, there are going to be two key
+factors that should guide your decision-making process:
+
+- You should try to access the database with the same tool that you will use to analyze the data. As you add more steps to get your data from the database to your analytics tool, you increase the ways in which new errors can arise. When you cannot access the database using the same tool that you will use to process the data, you should use psql to read and write CSV files to your database.
+- When writing data, you can save time by using the **COPY** or **\COPY** commands.
+
+## Going Passwordless
+In addition to everything mentioned so far, it is also a good idea to set up a **.pgpass** file. A **.pgpass** file specifies the parameters that you use to connect to your database, including your password. All of the programmatic methods of accessing the database discussed in this text (using either **psql** or Python) will allow you to skip the password parameter if your **.pgpass** file contains the password for the
+matching hostname, database, and username. This not only saves you time but also increases the security of your database because you can freely share your code without having to worry about passwords embedded in
+the code.
+
+On Unix-based systems and macOS, you can create the **.pgpass** file in your home directory. On Windows, you can create the file in **%APPDATA%\postgresql\pgpass.conf. %APPDATA%** is a Windows system value that points to the current application data folder. You can get the actual value of it by opening Windows Explorer, typing the exact word **%APPDATA%**, into the address bar and hitting Enter. The folder
+you are in is the folder this **%APPDATA%** value points to. The **.pgpass** file should contain one line for every database connection that you want to store, and it should follow this format (customized for your
+database parameters):
+```
+hostname:port:database:username:password
+```
+For your setup, the entry should be as follows (with the password properly set):
+```
+localhost:5432:sqlda:postgres:my_password
+```
+For Unix and Mac users, you will need to change the permissions on the file using the following command on the command line (in Terminal):
+```
+chmod 0600 ~/.pgpass
+```
+For Windows users, it is assumed that you have secured the permissions of the file so that other users cannot access it.
+
+Once you have created the file, you can test that it works by calling **psql** as follows in the terminal:
+```
+psql -h localhost -p 5432 -d sqlda -U postgres
+```
+As you can see, there is no prompt for the password. **psql** directly gets into the command interface.
+![Passwordless!](images/pass.png)
+
+Since the **.pgpass** file was created successfully, you will not be prompted for your password.
+
+With this, you can now connect to your database without typing the password, which both speeds up your development and mitigates the risk that you will accidentally share a password.
+
+In the following activity, you will use everything you have learned from this text to see how you can discover sales trends by importing new datasets.
+
+##### Using an External Dataset to Discover Sales Trends
+You are going to use the United States Census data on public transportation usage by zip code to see whether the level of use of public transportation shows any correlation to ZoomZoom sales in a given
+location. This will allow you to practice the following skills:
+- Importing and exporting data to and from your database
+- Interacting with your database programmatically (for example, using Python in conjunction with SQLAlchemy and **pandas**)
+
+This dataset contains three columns:
+- **zip_code**: This is the five-digit United States postal code that is used to identify a region.
+- **public_transportation_pct**: This is the percentage of the population in a postal code that has been identified as using public transportation to commute to work.
+- **public_transportation_population**: This is the raw number of people in a zip code that use public transportation to commute to work.
+
+Perform the following steps to complete this activity:
+1. Copy the data from the public transportation dataset to the ZoomZoom customer database by importing this data into a new table in the ZoomZoom database.
+
+2. Launch Jupyter Notebook from Anaconda Navigator. In the browser window that pops up, create a new Python 3 notebook. In the first cell, type in the standard import statements and the connection information (replacing _X with the appropriate parameter for your database connection)
+```
+from sqlalchemy import create_engine
+import pandas as pd
+%matplotlib inline
+cnxn_string = ("postgresql+psycopg2://{username}:{pswd}@{host}:
+{port}/{database}")
+print(cnxn_string)
+```
+Here is the output of the code:
+```
+postgresql+psycopg2://{username}:{pswd}@{host}:{port}/{database}
+```
+In the next cell, type the following code, which will create the **SQLAlchemy** engine:
+```
+engine = create_engine(
+cnxn_string.format(
+username="postgres",
+pswd="your_password",
+host="localhost",
+port=5432,
+database="sqlda"
+)
+)
+```
+3. Read the data using a command such as the following (replacing the path specified with the path to the file on your local computer):
+```
+data = pd.read_csv(
+  "c:\\Users\\Public\\public_transportation_statistics_by_
+zip_code.csv",
+dtype={'zip_code':str}
+)
+```
+4. Check that the data looks correct by creating a new cell, entering data, and then hitting *Shift + Enter* to view the contents of the data. You can also use **data.head()** to see only the first five rows:
+```
+data.head()
+```
+Here is the output of the code:
+![Reading the public transportation data into pandas!](images/public.png)
+
+5. Next, transfer data to the database using **data.to_sql()**. Using the **psql_insert_COPY** function, you can speed this up considerably; however, it is not necessary:
+```
+import csv
+from io import StringIO
+
+def psql_insert_copy(table, conn, keys, data_iter):
+    # gets a DBAPI connection that can provide a cursor 
+    dbapi_conn = conn.connection
+    with dbapi_conn.cursor() as cur:
+        s_buf = StringIO()
+        writer = csv.writer(s_buf) 
+        writer.writerows(data_iter) 
+        s_buf.seek(0)
+
+        columns = ', '.join('"{}"'.format(k) for k in keys) 
+        if table.schema:
+            table_name = '{}.{}'.format(table.schema, table.name) 
+        else:
+            table_name = table.name
+
+        sql = 'COPY {} ({}) FROM STDIN WITH CSV'.format(
+            table_name, 
+            columns
+        )
+        cur.copy_expert(sql=sql, file=s_buf)
+
+data.to_sql(
+    'public_transportation_by_zip', 
+    engine, 
+    if_exists='replace', 
+    method=psql_insert_copy
+)
+```
+Alternatively, you could have just performed the slower versionof this:
+```
+data.to_sql(
+'public_transportation_by_zip',
+engine,
+if_exists='replace'
+)
+```
+At this stage, you now have your data in your database, ready for querying.
+
+Find the maximum and minimum values of **public_transportation_pct** in this data. Values less than 0 will most likely be missing data.
+6. Execute the **max()** function to see the maximum value in the DataFrame. As explained before, this function will return the maximum values of all columns in this DataFrame:
+`data.max()`
+![Output of the pandas Data Frame max() method!](images/datamax.png)
+
+7. Execute the **min()** function to see the minimum value in the DataFrame. As explained before, this function will return the minimum values of all columns in this DataFrame:
+`data.min()`
+![Output of the pandas DataFrame min() method!](images/datamin.png)
+
+8. To see the range of **public_transportation_pct** values, you can simply query this from the database. First, you need to query the database:
+```
+engine.execute("""
+SELECT
+MAX(public_transportation_pct) AS max_pct,
+MIN(public_transportation_pct) AS min_pct
+FROM public_transportation_by_zip;
+""").fetchall()
+```
+You get the following result from your query:
+![Showing the minimum and maximum values!](images/minmax.png)
+Looking at the maximum and minimum values, you will see something strange: the minimum value is **-666666666**. You can assume that the values are missing, and you can remove them from the dataset.
+
+9. Calculate the average sales amounts for customers that live in high public transportation usage regions (over 10%) as well as low public transportation usage regions (less than, or equal to, 10%).
+Calculate the requested sales amounts by running a query in your database. Note that you will have to filter out the erroneous percentages that are less than 0 based on your analysis. There
+are several ways to do this; however, the following solution is a single succinct query: 
+```
+engine.execute(""" 
+    SELECT
+        (public_transportation_pct > 10) AS is_high_public_transport,
+        COUNT(s.customer_id) * 1.0 / COUNT(DISTINCT c.customer_id) AS sales_per_customer
+    FROM
+        customers c
+    INNER JOIN 
+        public_transportation_by_zip t 
+        ON t.zip_code = c.postal_code
+    LEFT JOIN 
+        sales s
+        ON s.customer_id = c.customer_id 
+    WHERE
+        public_transportation_pct >= 0 
+    GROUP BY
+        1
+    LIMIT
+    10
+""").fetchall()
+```
+Output:
+```
+[(False, Decimal('0.71569054583929793988')),
+ (True, Decimal('0.83159379407616361072'))]
+ ```
+ Here is an explanation of this query:
+- You first identify customers living in an area with public transportation by joining the **customer** table and the **public transportation** table.
+- Then, you look at the public transportation data associated with their postal code. If **public_transportation_pct > 10**, then the customer is in a high usage public transportation area. This expression will either return **True** or **False** for each customer.
+- You then group customers by this expression to identify the customers that are or are not in a high-usage public transportation area. One catch is that you need to exclude all zip codes where **public_transportation_pct** is less than **0** so that you exclude the missing data (denoted by **-666666666**).
+- You then look at sales per customer by joining the **customers** table with the **sales** table. You will first count the number of sales from the **sales** table **(COUNT(s.customer_id))** and divide it by the unique number of customers **(COUNT(DISTINCT c.customer_id))**. You want to make sure that you retain fractional values, so you can multiply by **1.0** to cast the entire expression to a float: **COUNT(s.customer_ id) * 1.0 / COUNT(DISTINCT c.customer_id)**. The result is the sales per customer.
+- Now that you know how to calculate both the sales per customer and the high public transportation flag per customer, you need to join your customer data to the public transportation data, and then, finally, to the sales data, to calculate them all in one single query. Once you put them side by side, you can aggregate the sales per customer by the high
+transportation flag to see the difference in customer behavior between different groups of public transportation availability.
+
+Eventually, you end up with the following output:
+![Calculating the requested sales amount!](images/sales%20amount.png)
+From this, you see that customers in high public transportation usage areas have 12% more product purchases than customers in low-usage public transportation areas.
+
+10. Read the data into **pandas** and plot a histogram of the distribution (Hint: you can use **my_data.plot.hist (y='public_transportation_pct')** to plot a histogram if you read
+the data into a **my_data pandas** DataFrame).
+Read this data from your database and add a **WHERE** clause to remove the outlier values. You can then plot the results from this query:
+```
+data = pd.read_sql_query(""" 
+    SELECT 
+        *
+    FROM 
+        public_transportation_by_zip 
+    WHERE 
+        public_transportation_pct > 0
+    AND 
+        public_transportation_pct < 50
+""", engine) 
+data.plot.hist(y='public_transportation_pct')
+```
+You will obtain an output similar to the following:
+![Jupyter notebook with an analysis of the public transportation data!](images/analysis.png)
+
+ Using **pandas**, test using the **to_sql** function with and without the **method=psql_insert_COPY** parameter. How do the speeds compare? (Hint: in a Jupyter notebook, you can add **%time** in front of your command to see how long it takes to execute the code.)
+ 11. Rerun your command from *Step 5* to get the timing of the standard **to_sql()** function:
+```
+%time data.to_sql('public_transportation_by_zip', engine, if_exists='replace', method=psql_insert_copy)
+
+%time data.to_sql('public_transportation_by_zip', engine, if_exists='replace')
+```
+The following is the output of the code:
+![Inserting records with COPY is much faster!](images/records.png)
+
+12. Group customers based on their zip code public transportation usage rounded to the nearest 10% and look at the average number of transactions per customer. Export this data to Excel and create a
+scatterplot to better understand the relationship between public transportation usage and sales.
+```
+data = pd.read_sql_query(""" 
+    SELECT
+        10 * ROUND(public_transportation_pct/10) AS public_transport,
+        COUNT(s.customer_id) * 1.0 / COUNT(DISTINCT c.customer_id) AS sales_per_customer
+    FROM 
+        customers c
+    INNER JOIN 
+        public_transportation_by_zip t 
+        ON t.zip_code = c.postal_code
+    LEFT JOIN 
+        sales s 
+        ON s.customer_id = c.customer_id 
+    WHERE 
+        public_transportation_pct >= 0
+    GROUP BY 
+        1
+""", engine)
+
+data.to_csv('~/Documents/Python-Crash-Course-Assignment/sql/sales_vs_public_transport_pct.csv')
+```
+First, you want to put your query results in a Python variable data so that you easily write the result to a CSV file later.
+
+Next is the tricky part: you want to aggregate the public transportation statistics somehow. What you can do is round this percentage to the nearest 10%, so 22% would become 20%, and so on. You can do this by dividing the percentage number (represented as 0.0-100.0) by 10, rounding off, and then multiplying it back by **10: 10 * ROUND(public_transportation_pct/10)**.
+
+The logic for the remainder of the query is explained in *Step 9*.
+
+Next, you open the **sales_vs_public_transport_pct.csv** file in Excel:
+![Excel workbook containing the data from your query!](images/excel.png)
+After creating the scatterplot, you get the following result, which shows a clear positive relationship between public transportation and sales in the geographical area:
+![Sales per customer versus public transportation usage percentage!](images/workbookexcell.jpg)
+
+13. Based on this analysis, determine what recommendations you would have for the executive team at ZoomZoom when considering expansion opportunities.
+
+Based on all this analysis, you can say that there is a positive relationship between "geographies with public transportation" and "the demand for electric vehicles." Intuitively, this makes sense, because
+electric vehicles could provide an alternative transportation option to public transport for getting around cities. As a result of this analysis, you would recommend that ZoomZoom management should consider expanding in regions with high public transportation usage and in urban areas.
+
+
+
+
+
+
+
+
+# Analytics Using Complex Data Types
+While data is typically thought of as numbers, in the real world, it frequently exists in other formats: text, dates and times, and latitude and longitude. In addition to these specialty data types, other data types provide the context regarding sequential or non-predeterministic attributes. The goal of this text is to show how you can use SQL and analytics techniques to produce insights from these other data types.
+
+By the end of this text, you will be able to perform descriptive analytics on time series data using **datetime**. You will use geospatial data to identify relationships, then extract insights from complex data types (that is, arrays, JSON, and JSONB) and perform text analytics.
+
+In this article, you have learned a lot about SQL's processing power over numbers and strings. The majority of data analytics tasks are indeed analyzing numbers and strings. However, in the real world,
+data is often found in various other formats, such as words, locations, dates, and, sometimes, complex data structures. This data, although presented as numbers and strings, has its own domain of operation
+and computation instead of simple arithmetic. For example, adding one day to January 31, 2022, will result in February 1, 2022, not January 32, 2022.
+
+In this text, you will look at these data types and examine how you can use this data in your analysis:
+- Date and time
+- Geospatial
+- JSON
+- ARRAY
+- Text
+
+By the end of the text, you will have broadened your analysis capabilities so that you can leverage just about any type of data available to you.
+
+## Date and Time Data types for Analysis
+You may be familiar with dates and times, but do you know how these quantitative measures are represented? They are represented using numbers, but not a single number. Instead, they are measured with a set of numbers, with one number each for year, month, day, hour, minute, second, and millisecond.
+
+This is a complex representation, comprising several different components. For example, knowing the current minute without knowing the current hour does not serve any purpose. Additionally, there are complex ways of interacting with dates and times; for example, different points in time can be subtracted from one another. The current time can be represented differently depending on where you are in the world.
+
+As a result of these intricacies, you need to take special care when working with this type of data. In fact, PostgreSQL, like most databases, offers special data types that can represent these types of
+values. You will start by examining the **DATE** type.
+
+### The DATE Data type
+Dates can be easily represented using strings or numbers (for example, both **January 1, 2022** and **01/01/2022** clearly represent a specific date), but dates are a special form of data as they represent a quantitative value that does not always follow the simple numerical sequence. Adding 1 week to the current date means adding seven days, for example. A given date has different properties that you might want to use in your analysis—for instance, the year or the day of the week that the date represents. Working with dates is also necessary for time series analysis, which is one of the most common types of analysis that come up. The SQL standard includes the **DATE** data type, and
+PostgreSQL offers great functionality for interacting with this data type.
+
+The most common concern about the **DATE** data type is the display format. Different regions use different formats to represent the same date. For example, the date **January 14, 2022** is written as **01/14/2022** in some countries but **14/01/2022** in others. You can set your database to display dates in the format that you are most familiar with. PostgreSQL uses the **DateStyle** parameter to configure these settings. To view your current settings, you can use the following command:
+```
+SHOW DateStyle;
+```
+The following is the output of the preceding query in a system where both the PostgreSQL server and the pgAdmin client are installed on the same Windows server whose system locale is set to the United States:
+```
+DateStyle
+-----------
+ISO, MDY
+(1 row)
+```
+
+The first output specifies the **International Organization Standardization (ISO)** output format, which displays the date as *Year-Month-Day*, and the second output parameter specifies the ordering
+for input or output. In this case, since both the server and client are using a United States locale, *Month/Day/Year* is used as the display style. If your PostgreSQL server or client is installed on an operating system with a different system locale than the one mentioned here, the result of the previous command may be different. For example, if you wanted to set it to the European format of Day, Month, Year, you would set **DateStyle** to '**GERMAN**, **DMY**'. You can configure the output for your database using the following command:
+```
+SET DateStyle='GERMAN, DMY';
+```
+For this text, you will use the ISO display format (*Year-Month-Day*) and the *Month/Day/Year* input format. You can configure this format by using the preceding command.
+
+Now, start by testing out the **DATE** format:
+```
+SELECT '1/8/2022'::DATE;
+```
+The following is the output of the query:
+```
+date
+------------
+2022-01-08
+(1 row)
+```
+As you can see, when you input a string, **1/8/2022**, using the *Month/Day/Year* format, PostgreSQL understands that this is January 8, 2022 (and not August 1, 2022). It displays the date using the ISO format specified previously, in the form of YYYY-MM-DD.
+
+Similarly, you could use the following formats with dashes and periods to separate the date components, with the same result:
+```
+SELECT '1-8-2022'::DATE;
+```
+The following is the output of the query:
+```
+date
+------------
+2022-01-08
+(1 row)
+```
+In addition to displaying dates that are input as strings, you can display the current date by simply using the **current_date** keyword in PostgreSQL:
+```
+SELECT current_date;
+```
+The following is the output of the query:
+```
+current_date
+--------------
+2022-06-05
+(1 row)
+```
+The **DATE** data type is useful. The natural extension of it is the data type representing the time, such as 10 a.m. or 2 p.m., in a day. The interesting fact is that when people talk about time, they usually refer to the combination of a day and a time. Simply referring to a time is not enough to determine the exact moment that something happens. For example, "the class starts at 6 p.m." very likely implies that the class starts at 6 p.m. every Monday for this semester. To avoid any confusion, the SQL standard offers the **TIMESTAMP** data type, which represents a date and a time, down to a microsecond, for example, **2022-06-05 13:47:44.472096**.
+
+You can see the current timestamp using the **NOW()** function, and you can specify your time zone using **AT TIME ZONE** **'time zone'**. Here is an example of the **NOW()** function with the Eastern Standard time zone specified:
+```
+SELECT NOW() AT TIME ZONE 'EST';
+```
+The following is the output of the query:
+```
+timezone
+----------------------------
+29.03.2023 12:06:20.559768
+(1 row)
+```
+You can also use the **TIMESTAMP** data type without the time zone specified. You can get the current time zone with the **NOW()** function:
+```
+SELECT NOW();
+```
+The following is the output of the query. The -04 at the end of the string indicates the output time zone:
+```
+now
+-------------------------------
+29.03.2023 20:09:15.011635 EAT
+(1 row)
+```
+**Note**
+In general, it is recommended that you use the timestamp with the time zone specified. If you do not specify the time zone, the value of the timestamp could be questionable (for example, the time could be
+represented in the time zone where the company is located, in **Coordinated Universal Time (UTC)** time, or the customer's time zone).
+
+The **DATE** and **TIMESTAMP** data types are helpful not only because they display dates in a readable format, but also because they store these values using fewer bytes than the equivalent string representation (a **DATE** type value requires only 4 bytes, while the equivalent text representation might be 8 bytes for an eight-character representation such as **'20160101'**). Additionally, PostgreSQL provides special functionalities to manipulate and transform dates. This is particularly
+useful for data analytics.
+
+#### Transforming Date Data types
+Often, you will want to decompose your dates into their component parts. For example, while daily sales are important, you may also be interested in the summary for each year and month, so that you can review the monthly trend of your sales. You may see from this trend which month is your bestselling one so that you can prepare your inventory in advance. To do this, you can use **EXTRACT(component FROM date)**. Here is an example:
+```
+SELECT
+current_date,
+EXTRACT(year FROM current_date) AS year,
+EXTRACT(month FROM current_date) AS month,
+EXTRACT(day FROM current_date) AS day;
+```
+The following is the output of the code:
+```
+current_date | year | month | day
+--------------+------+-------+-----
+2023-03-29 | 2023 | 3 | 29
+(1 row)
+```
+Similarly, you can abbreviate these components as **y**, **mon**, and **d**, and PostgreSQL will understand what you want:
+```
+SELECT
+current_date,
+EXTRACT(y FROM current_date) AS year,
+EXTRACT(mon FROM current_date) AS month,
+EXTRACT(d FROM current_date) AS day;
+```
+The following is the output of the code:
+```
+current_date | year | month | day
+--------------+------+-------+-----
+2023-03-29 | 2023 | 3 | 29
+(1 row)
+```
+
+In addition to the year, month, and day, you will sometimes want additional components, such as day of the week, week of the year, or quarter. You can extract these date parts as follows:
+```
+SELECT
+current_date,
+EXTRACT(dow FROM current_date) AS day_of_week,
+EXTRACT(week FROM current_date) AS week_of_year,
+EXTRACT(quarter FROM current_date) AS quarter;
+```
+The following is the output of the code:
+```
+current_date | day_of_week | week | quarter
+--------------+-------------+------+---------
+2023-03-29 | 3 | 13 | 1
+(1 row)
+```
+**Note**
+**EXTRACT** always outputs a number; so, in this case, **day_of_week** starts at 0 (Sunday) and goes up to 6 (Saturday). Instead of **dow**, you can use **isodow**, which starts at 1 (Monday) and goes up to 7
+(Sunday).
+
+In addition to extracting date parts from a date, you may want to simply truncate your date or timestamp. For example, say you want to view the year and month summary for sales, but you only have the date in the sales table. To aggregate the sales for year/month, you need to remove the day and timestamp from the date and get the year+month output. This can be done using many functions, such as **DATE_TRUNC()**, **DATE_PART()**, or **EXTRACT()**, each with a slightly different syntax and
+purpose. In the following example, you will use the **TO_CHAR()** function, which extracts the designated parts of a date and organizes them into one string, because it offers maximum flexibility over what information you can get and how you want to present it:
+```
+SELECT NOW(), TO_CHAR(NOW(), 'yyyymm') AS yearmonth;
+```
+The following is the output of the code:
+```
+now | yearmonth
+-------------------------------+------------------------
+29.03.2023 20:27:02.495868 EAT | 202303
+```
+The date part extraction functions such as **TO_CHAR()** and **EXTRACT()** are particularly useful for **GROUP BY** statements. For example, you can use it to group sales by year and month and get the monthly sales for the whole year:
+```
+SELECT
+TO_CHAR(sales_transaction_date, 'yyyymm') AS yearmonth,
+SUM(sales_amount) AS total_quarterly_sales
+FROM
+sales
+GROUP BY
+1
+ORDER BY
+1 DESC;
+```
+The result is as follows:
+![Monthly sales using TO_CHAR!](images/tocharqu.png)
+
+## Intervals
+In addition to representing dates, you can also represent fixed time intervals using the **INTERVAL** data type. This data type is useful if you want to analyze how long something takes. For example, when customers receive a promotional email, they may not open it immediately. The interval between the date the email is received and the date the email is opened can indicate how attractive the email is to the customers. If you want to know how long it takes a customer to open an email after receiving it, you need to calculate the interval between those two dates.
+
+Here is an example:
+```
+SELECT INTERVAL '5 days';
+```
+The following is the output of the code:
+```
+interval
+----------
+5 days
+(1 row)
+```
+Intervals are useful for measuring the difference between two timestamps by subtracting these two timestamps. They can also be used to add to/subtract from a timestamp to get a new timestamp. For example, if you want to measure the length of February, you can calculate the interval between the first day of February and the first day of March:
+```
+SELECT TIMESTAMP '2022-03-01 00:00:00' - TIMESTAMP '2022-02-01
+00:00:00' AS days_in_feb;
+```
+The following is the output of the code:
+```
+days_in_feb
+-------------
+28 days
+(1 row)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
