@@ -2535,7 +2535,7 @@ SELECT *
 FROM customers
 LIMIT 5
 )
-TO 'c:\Users\Public\my_file.csv'
+TO '~/Documents/Python-Crash-Course-Assignment/sql/my_file.csv'
 WITH CSV HEADER;
 ```
 The output will be the following:
@@ -2559,7 +2559,7 @@ SELECT *
 FROM customers
 LIMIT 5
 )
-TO 'c:\Users\Public\my_file.csv'
+TO '~/Documents/Python-Crash-Course-Assignment/sql/my_file.csv'
 WITH CSV HEADER;
 ```
 The following is the output of the code:
@@ -2619,7 +2619,7 @@ customers
 LIMIT
 5
 );
-\COPY (SELECT * FROM customers_sample) TO 'c:\Users\Public\my_file.csv'
+\COPY (SELECT * FROM customers_sample) TO '~/Documents/Python-Crash-Course-Assignment/sql/my_file.csv'
 WITH CSV HEADER
 DROP VIEW customers_sample;
 ```
@@ -2638,7 +2638,7 @@ text files (for example, for CSV files, or | for pipe-separated files).
 
 For example, running from **psql**, the following would create a pipe-separated file, with a header, with empty (0 lengths) strings to represent a missing (**NULL**) value, and the double quote (") character to represent the quote character:
 ```
-\COPY customers TO 'c:\Users\Public\my_file.csv' WITH CSV HEADER
+\COPY customers TO '~/Documents/Python-Crash-Course-Assignment/sql/my_file.csv' WITH CSV HEADER
 DELIMITER '|' NULL '' QUOTE '"'
 ```
 The following is the output of the code:
@@ -2661,7 +2661,7 @@ SELECT * FROM customers LIMIT 1
 ```
 Then, run the following **\COPY** command to test its data loading functionality:
 ```
-\COPY customers_csv FROM 'c:\Users\Public\my_file.csv' CSV HEADER
+\COPY customers_csv FROM '~/Documents/Python-Crash-Course-Assignment/sql/my_file.csv' CSV HEADER
 DELIMITER '|'
 ```
 This outputs the following:
@@ -2710,7 +2710,7 @@ CREATE TEMP VIEW top_cities AS (
 3. Copy the **top_cities** view from your **ZoomZoom** database to a local file in **.csv** format. You do this by utilizing the temporary view you just created using the following command. Please note that
 the OS-specific path needs to be prepended to the **top_cities.csv** filename to specify the location to save the file. Here, in a windows environment, you will use **c:\Users\Public** as the folder:
 ```
-\COPY (SELECT * FROM top_cities) TO 'c:\Users\Public\top_cities.csv'
+\COPY (SELECT * FROM top_cities) TO '~/Documents/Python-Crash-Course-Assignment/sql/top_cities.csv'
 WITH CSV HEADER DELIMITER ','
 ```
 4. Drop the view:
@@ -3396,6 +3396,226 @@ electric vehicles could provide an alternative transportation option to public t
 
 
 
+
+
+# Analytics Using Complex Data Types
+While data is typically thought of as numbers, in the real world, it frequently exists in other formats: text, dates and times, and latitude and longitude. In addition to these specialty data types, other data types provide the context regarding sequential or non-predeterministic attributes. The goal of this text is to show how you can use SQL and analytics techniques to produce insights from these other data types.
+
+By the end of this text, you will be able to perform descriptive analytics on time series data using **datetime**. You will use geospatial data to identify relationships, then extract insights from complex data types (that is, arrays, JSON, and JSONB) and perform text analytics.
+
+In this article, you have learned a lot about SQL's processing power over numbers and strings. The majority of data analytics tasks are indeed analyzing numbers and strings. However, in the real world,
+data is often found in various other formats, such as words, locations, dates, and, sometimes, complex data structures. This data, although presented as numbers and strings, has its own domain of operation
+and computation instead of simple arithmetic. For example, adding one day to January 31, 2022, will result in February 1, 2022, not January 32, 2022.
+
+In this text, you will look at these data types and examine how you can use this data in your analysis:
+- Date and time
+- Geospatial
+- JSON
+- ARRAY
+- Text
+
+By the end of the text, you will have broadened your analysis capabilities so that you can leverage just about any type of data available to you.
+
+## Date and Time Data types for Analysis
+You may be familiar with dates and times, but do you know how these quantitative measures are represented? They are represented using numbers, but not a single number. Instead, they are measured with a set of numbers, with one number each for year, month, day, hour, minute, second, and millisecond.
+
+This is a complex representation, comprising several different components. For example, knowing the current minute without knowing the current hour does not serve any purpose. Additionally, there are complex ways of interacting with dates and times; for example, different points in time can be subtracted from one another. The current time can be represented differently depending on where you are in the world.
+
+As a result of these intricacies, you need to take special care when working with this type of data. In fact, PostgreSQL, like most databases, offers special data types that can represent these types of
+values. You will start by examining the **DATE** type.
+
+### The DATE Data type
+Dates can be easily represented using strings or numbers (for example, both **January 1, 2022** and **01/01/2022** clearly represent a specific date), but dates are a special form of data as they represent a quantitative value that does not always follow the simple numerical sequence. Adding 1 week to the current date means adding seven days, for example. A given date has different properties that you might want to use in your analysis—for instance, the year or the day of the week that the date represents. Working with dates is also necessary for time series analysis, which is one of the most common types of analysis that come up. The SQL standard includes the **DATE** data type, and
+PostgreSQL offers great functionality for interacting with this data type.
+
+The most common concern about the **DATE** data type is the display format. Different regions use different formats to represent the same date. For example, the date **January 14, 2022** is written as **01/14/2022** in some countries but **14/01/2022** in others. You can set your database to display dates in the format that you are most familiar with. PostgreSQL uses the **DateStyle** parameter to configure these settings. To view your current settings, you can use the following command:
+```
+SHOW DateStyle;
+```
+The following is the output of the preceding query in a system where both the PostgreSQL server and the pgAdmin client are installed on the same Windows server whose system locale is set to the United States:
+```
+DateStyle
+-----------
+ISO, MDY
+(1 row)
+```
+
+The first output specifies the **International Organization Standardization (ISO)** output format, which displays the date as *Year-Month-Day*, and the second output parameter specifies the ordering
+for input or output. In this case, since both the server and client are using a United States locale, *Month/Day/Year* is used as the display style. If your PostgreSQL server or client is installed on an operating system with a different system locale than the one mentioned here, the result of the previous command may be different. For example, if you wanted to set it to the European format of Day, Month, Year, you would set **DateStyle** to '**GERMAN**, **DMY**'. You can configure the output for your database using the following command:
+```
+SET DateStyle='GERMAN, DMY';
+```
+For this text, you will use the ISO display format (*Year-Month-Day*) and the *Month/Day/Year* input format. You can configure this format by using the preceding command.
+
+Now, start by testing out the **DATE** format:
+```
+SELECT '1/8/2022'::DATE;
+```
+The following is the output of the query:
+```
+date
+------------
+2022-01-08
+(1 row)
+```
+As you can see, when you input a string, **1/8/2022**, using the *Month/Day/Year* format, PostgreSQL understands that this is January 8, 2022 (and not August 1, 2022). It displays the date using the ISO format specified previously, in the form of YYYY-MM-DD.
+
+Similarly, you could use the following formats with dashes and periods to separate the date components, with the same result:
+```
+SELECT '1-8-2022'::DATE;
+```
+The following is the output of the query:
+```
+date
+------------
+2022-01-08
+(1 row)
+```
+In addition to displaying dates that are input as strings, you can display the current date by simply using the **current_date** keyword in PostgreSQL:
+```
+SELECT current_date;
+```
+The following is the output of the query:
+```
+current_date
+--------------
+2022-06-05
+(1 row)
+```
+The **DATE** data type is useful. The natural extension of it is the data type representing the time, such as 10 a.m. or 2 p.m., in a day. The interesting fact is that when people talk about time, they usually refer to the combination of a day and a time. Simply referring to a time is not enough to determine the exact moment that something happens. For example, "the class starts at 6 p.m." very likely implies that the class starts at 6 p.m. every Monday for this semester. To avoid any confusion, the SQL standard offers the **TIMESTAMP** data type, which represents a date and a time, down to a microsecond, for example, **2022-06-05 13:47:44.472096**.
+
+You can see the current timestamp using the **NOW()** function, and you can specify your time zone using **AT TIME ZONE** **'time zone'**. Here is an example of the **NOW()** function with the Eastern Standard time zone specified:
+```
+SELECT NOW() AT TIME ZONE 'EST';
+```
+The following is the output of the query:
+```
+timezone
+----------------------------
+29.03.2023 12:06:20.559768
+(1 row)
+```
+You can also use the **TIMESTAMP** data type without the time zone specified. You can get the current time zone with the **NOW()** function:
+```
+SELECT NOW();
+```
+The following is the output of the query. The -04 at the end of the string indicates the output time zone:
+```
+now
+-------------------------------
+29.03.2023 20:09:15.011635 EAT
+(1 row)
+```
+**Note**
+In general, it is recommended that you use the timestamp with the time zone specified. If you do not specify the time zone, the value of the timestamp could be questionable (for example, the time could be
+represented in the time zone where the company is located, in **Coordinated Universal Time (UTC)** time, or the customer's time zone).
+
+The **DATE** and **TIMESTAMP** data types are helpful not only because they display dates in a readable format, but also because they store these values using fewer bytes than the equivalent string representation (a **DATE** type value requires only 4 bytes, while the equivalent text representation might be 8 bytes for an eight-character representation such as **'20160101'**). Additionally, PostgreSQL provides special functionalities to manipulate and transform dates. This is particularly
+useful for data analytics.
+
+#### Transforming Date Data types
+Often, you will want to decompose your dates into their component parts. For example, while daily sales are important, you may also be interested in the summary for each year and month, so that you can review the monthly trend of your sales. You may see from this trend which month is your bestselling one so that you can prepare your inventory in advance. To do this, you can use **EXTRACT(component FROM date)**. Here is an example:
+```
+SELECT
+current_date,
+EXTRACT(year FROM current_date) AS year,
+EXTRACT(month FROM current_date) AS month,
+EXTRACT(day FROM current_date) AS day;
+```
+The following is the output of the code:
+```
+current_date | year | month | day
+--------------+------+-------+-----
+2023-03-29 | 2023 | 3 | 29
+(1 row)
+```
+Similarly, you can abbreviate these components as **y**, **mon**, and **d**, and PostgreSQL will understand what you want:
+```
+SELECT
+current_date,
+EXTRACT(y FROM current_date) AS year,
+EXTRACT(mon FROM current_date) AS month,
+EXTRACT(d FROM current_date) AS day;
+```
+The following is the output of the code:
+```
+current_date | year | month | day
+--------------+------+-------+-----
+2023-03-29 | 2023 | 3 | 29
+(1 row)
+```
+
+In addition to the year, month, and day, you will sometimes want additional components, such as day of the week, week of the year, or quarter. You can extract these date parts as follows:
+```
+SELECT
+current_date,
+EXTRACT(dow FROM current_date) AS day_of_week,
+EXTRACT(week FROM current_date) AS week_of_year,
+EXTRACT(quarter FROM current_date) AS quarter;
+```
+The following is the output of the code:
+```
+current_date | day_of_week | week | quarter
+--------------+-------------+------+---------
+2023-03-29 | 3 | 13 | 1
+(1 row)
+```
+**Note**
+**EXTRACT** always outputs a number; so, in this case, **day_of_week** starts at 0 (Sunday) and goes up to 6 (Saturday). Instead of **dow**, you can use **isodow**, which starts at 1 (Monday) and goes up to 7
+(Sunday).
+
+In addition to extracting date parts from a date, you may want to simply truncate your date or timestamp. For example, say you want to view the year and month summary for sales, but you only have the date in the sales table. To aggregate the sales for year/month, you need to remove the day and timestamp from the date and get the year+month output. This can be done using many functions, such as **DATE_TRUNC()**, **DATE_PART()**, or **EXTRACT()**, each with a slightly different syntax and
+purpose. In the following example, you will use the **TO_CHAR()** function, which extracts the designated parts of a date and organizes them into one string, because it offers maximum flexibility over what information you can get and how you want to present it:
+```
+SELECT NOW(), TO_CHAR(NOW(), 'yyyymm') AS yearmonth;
+```
+The following is the output of the code:
+```
+now | yearmonth
+-------------------------------+------------------------
+29.03.2023 20:27:02.495868 EAT | 202303
+```
+The date part extraction functions such as **TO_CHAR()** and **EXTRACT()** are particularly useful for **GROUP BY** statements. For example, you can use it to group sales by year and month and get the monthly sales for the whole year:
+```
+SELECT
+TO_CHAR(sales_transaction_date, 'yyyymm') AS yearmonth,
+SUM(sales_amount) AS total_quarterly_sales
+FROM
+sales
+GROUP BY
+1
+ORDER BY
+1 DESC;
+```
+The result is as follows:
+![Monthly sales using TO_CHAR!](images/tocharqu.png)
+
+## Intervals
+In addition to representing dates, you can also represent fixed time intervals using the **INTERVAL** data type. This data type is useful if you want to analyze how long something takes. For example, when customers receive a promotional email, they may not open it immediately. The interval between the date the email is received and the date the email is opened can indicate how attractive the email is to the customers. If you want to know how long it takes a customer to open an email after receiving it, you need to calculate the interval between those two dates.
+
+Here is an example:
+```
+SELECT INTERVAL '5 days';
+```
+The following is the output of the code:
+```
+interval
+----------
+5 days
+(1 row)
+```
+Intervals are useful for measuring the difference between two timestamps by subtracting these two timestamps. They can also be used to add to/subtract from a timestamp to get a new timestamp. For example, if you want to measure the length of February, you can calculate the interval between the first day of February and the first day of March:
+```
+SELECT TIMESTAMP '2022-03-01 00:00:00' - TIMESTAMP '2022-02-01
+00:00:00' AS days_in_feb;
+```
+The following is the output of the code:
+```
+days_in_feb
+-------------
+28 days
+(1 row)
+```
 
 
 
