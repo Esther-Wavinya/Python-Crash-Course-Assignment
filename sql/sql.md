@@ -3616,19 +3616,813 @@ days_in_feb
 28 days
 (1 row)
 ```
+Alternatively, intervals can be used to add the number of days to a timestamp to get a new timestamp, such as "what is the date seven days from now?":
+```
+SELECT TIMESTAMP '2022-06-05 00:00:00' + INTERVAL '7 days' AS
+new_date;
+```
+The following is the output of the code:
+```
+new_date
+---------------------
+2022-06-12 00:00:00
+(1 row)
+```
+While intervals offer a precise method for doing timestamp arithmetic, the **DATE** format can be used with integers to accomplish a similar result. In the following example, you simply add 7 (an integer) to
+the date to calculate the new date:
+```
+SELECT DATE '2022-06-05' + 7 AS new_date;
+```
+The following is the output of the code:
+```
+new_date
+------------
+2022-06-12
+(1 row)
+```
+Similarly, you can subtract two dates and get an integer result:
+```
+SELECT DATE '2022-03-01' - DATE '2022-02-01' AS days_in_feb;
+``` 
+The following is the output of the code:
+```
+days_in_feb
+-------------
+28
+(1 row)
+```
+While the **DATE** data type offers ease of use, the timestamp with the **TIME ZONE** data type offers precision. If you need your date/time field to be precisely the same as the time at which the action occurred, you should use the timestamp with the time zone. If not, you can use the **DATE** field.
 
+### Analytics with Time Series Data
+ZoomZoom has ramped up its efforts to recruit more customers during the year 2021, hoping that it can sell more vehicles as the number of new customers grows. In this exercise, you will perform a basic analysis using time series data to gain insight into whether the sales were affected by the number of new customers. While it makes sense to have a day-by-day comparison, daily sales/recruitments can fluctuate significantly. It is generally recommended to start from a longer time span, such as monthly sales/recruitment, and break down the numbers once you find any patterns.
 
+Perform the following steps to complete the exercise:
+1. First, look at the number of monthly sales. You can use the following aggregate query with the **TO_CHAR** method:
+```
+SELECT
+TO_CHAR(sales_transaction_date, 'yyyymm') AS month_date,
+COUNT(1) AS number_of_sales
+FROM
+sales
+WHERE
+EXTRACT(year FROM sales_transaction_date) = 2021
+GROUP BY
+1
+ORDER BY
+1;
+```
+After running this SQL, you will get the following result:
+![Monthly number of sales!](images/monthlysales.png)
 
+2. Run another query to get the number of new customers joining each month:
+```
+SELECT
+TO_CHAR(date_added, 'yyyymm') AS month_date,
+COUNT(1) AS number_of_new_customers
+FROM
+customers
+WHERE
+EXTRACT(year FROM date_added) = 2021
+GROUP BY
+1
+ORDER BY
+1;
+```
+The following is the output of the preceding query:
+![Number of new customer sign-ups every month!](images/newcustomers.png)
+You can probably see that the flow of new potential customers is fairly steady and hovers around 400-500 new customer sign-ups every month, while the number of sales (as queried in step 1) varies considerably. So, it looks like the effort of signing up new customers may not be directly related to the sales amount.
 
+In this exercise, you used a PostgreSQL function to extract year and month parts from a date and used the extracted information to aggregate sales data and customer recruitment data to form a time series for comparison. In the next section, you will learn about another data type that has its own domain of operations, geospatial data.
 
+## Performing Geospatial Analysis in PostgreSQL
+In addition to looking at time series data to better understand trends, you can also use geospatial information (such as city, country, or latitude and longitude) to better understand your customers. For example, governments use geospatial analysis to better understand regional economic differences, while a ride-sharing platform might use geospatial data to find the closest driver for a customer.
 
+You can represent a geospatial location using latitude and longitude coordinates, and this will be the fundamental building block for you to begin geospatial analysis.
 
+### Latitude and Longitude
+Locations are often thought about in terms of the address—the city, state, country, or postal code that is assigned to the location that you are interested in. This is usually from an analytics perspective. For
+example, you can look at the sales volume in the ZoomZoom sales table by city and come up with meaningful results about which cities are performing well.
 
+Often, you need to understand geospatial relationships numerically to understand the distances between two points or relationships that vary based on where you are on a map. After all, if you live on the border between two cities, it is unlikely that your spending behavior will suddenly change if you walk across into the other city.
 
+Latitude and longitude allow you to look at the location in a continuous context. This allows you to analyze the numeric relationships between location and other factors (for example, sales). Latitude and longitude also enable you to look at the distances between two locations.
 
+Latitude tells you how far north or south a point is. A point at +90° latitude is at the North Pole, while a point at 0° latitude is at the equator, and a point at -90° is at the South Pole. On a map, lines of
+constant latitude run east and west.
 
+Longitude tells you how far east or west a point is. On a map, lines of constant longitude run north and south. Greenwich, England, is the point of 0° longitude. Points can be defined using longitude as west (-) or east (+) of this point and values range from -180° west to +180° east. These values are equivalent because they both point to the vertical line that runs through the Pacific Ocean, which is halfway around the world from Greenwich, England.
+#### Representing Latitude and Longitude in PostgreSQL
+In PostgreSQL, you can represent latitude and longitude using two floating-point numbers. In fact, this is how latitude and longitude are represented in the ZoomZoom **Customers** table:
+```
+SELECT
+latitude,
+longitude
+FROM
+customers
+WHERE
+latitude IS NOT NULL
+LIMIT
+10;
+```
+Here is the output of the preceding query:
+![The latitudes and longitudes of ZoomZoom customers!](images/LATLONG.png)
+Here, you can see that all the latitudes are positive because the United States is north of the equator. All the longitudes are negative because the United States is west of Greenwich, England. You can also notice that some customers do not have latitude and longitude values filled in, because their location is unknown.
 
+While these values can give you the exact location of a customer, you cannot do much with that information, because distance calculations require trigonometry and make simplifying assumptions that the earth is perfectly round.
 
+Thankfully, PostgreSQL has the tools to solve this problem. You can calculate distances in PostgreSQL using two packages, **earthdistance** and **cube**. You can install these two packages by running the following two commands in **pgAdmin**:
+```
+CREATE EXTENSION cube;
+CREATE EXTENSION earthdistance;
+```
+These two extensions only need to be installed once by running the two preceding commands. The **earthdistance** module depends on the **cube** module so you must install the **cube** module first. Once you install the **earthdistance** module, you can define a **POINT** data type:
+```
+SELECT
+POINT(longitude, latitude)
+FROM
+customers
+WHERE
+longitude IS NOT NULL
+LIMIT
+10;
+```
+Here is the output of the preceding query:
+![Customer latitude and longitude represented as points in PostgreSQL!](images/CUSTLAT.png)
+**Note**
+A **POINT** data type is defined as a combination of two numbers enclosed with parenthesis, with the first number being longitude and the second being latitude, such as (**-90, 38**). This is contrary to the
+convention of latitude followed by longitude. The rationale behind this is that longitude more closely represents points along an x axis, latitude more closely represents points on the y axis, and in mathematics, graphical points are usually noted by their x coordinate followed by their y coordinate.
+
+The **earthdistance** module also allows you to calculate the distance between points in miles:
+```
+SELECT
+point(-90, 38) <@> point(-91, 37) AS distance_in_miles;
+```
+Here is the output of the preceding query:
+```
+distance_in_miles
+-------------------
+88.1949338379752
+(1 row)
+```
+In this example, you defined two points, (**38° N, 90° W) and (37° N, 91° W**), and were able to calculate the distance between these points using the **<@>** operator. This operator calculates the distance in miles (in this case, these two points are **88.2** miles apart).
+
+In the next exercise, you will see how you can use these distance calculations in a practical business context.
+
+### Geospatial Analysis
+In this exercise, you will identify the closest dealership for each customer. ZoomZoom marketers are trying to increase customer engagement by helping customers find their nearest dealership. The product team is also interested to know what the typical distance is between each customer and their closest dealership.
+
+Follow these steps to implement the exercise:
+1. Create a table with the longitude and latitude points for every customer:
+```
+CREATE TEMP TABLE customer_points AS (
+SELECT
+customer_id,
+point(longitude, latitude) AS lng_lat_point
+FROM
+customers
+WHERE
+longitude IS NOT NULL
+AND
+latitude IS NOT NULL
+);
+```
+2. Create a similar table for every dealership:
+```
+CREATE TEMP TABLE dealership_points AS (
+SELECT
+dealership_id,
+point(longitude, latitude) AS lng_lat_point
+FROM
+dealerships
+);
+```
+3. Cross-join these tables to calculate the distance from each customer to each dealership (in miles):
+```
+CREATE TEMP TABLE customer_dealership_distance AS (
+SELECT
+customer_id,
+dealership_id,
+c.lng_lat_point <@> d.lng_lat_point AS distance
+FROM
+customer_points c
+CROSS JOIN
+dealership_points d
+);
+```
+4. Finally, for each customer ID, you select the dealership with the shortest distance. So far, you have got the location for customers and dealerships and obtained distances from each customer to each dealership. The next task is to find the customer-dealership combination that has the shortest distance for the customer using a **DISTINCT ON** clause. As discussed in Importing and Exporting Data, the **DISTINCT ON** clause guarantees only the first record for each unique value of the column in parentheses. In this case, you will get one record for every **customer_id** value, and because this is sorted by distance to dealerships, you will get the dealership that has the shortest distance:
+```
+CREATE TEMP TABLE closest_dealerships AS (
+SELECT DISTINCT ON (customer_id)
+customer_id,
+dealership_id,
+distance
+FROM customer_dealership_distance
+ORDER BY customer_id, distance
+);
+```
+
+5. Now that you have the data to fulfill the marketing team's request, you can calculate the typical distance from each customer to their closest dealership. You have learned that there are two common ways to represent the typical value of a dataset, mean and median. You will get both using the following query:
+```
+SELECT
+AVG(distance) AS avg_dist,
+PERCENTILE_DISC(0.5)
+WITHIN GROUP (ORDER BY distance) AS median_dist
+FROM
+closest_dealerships;
+```
+Here is the output of the preceding query:
+![The average and median distances between customers and their closest dealership!](images/meanmedian.png)
+The result is that the average distance is about **147** miles away, but the median distance is about **91** miles.
+
+There is a clear difference between the mean and median. As you learned in, *Understanding and Describing Data*, both are important indicators of central tendency, which represents the most typical value of the dataset. But why are these two typical values for the same dataset so different? What does this tell you about the data? In, *Understanding and Describing Data*, you learned that the **mean** is more sensitive to outliers. There are apparently some customers whose distance to the closest dealership is much greater than most customers. As such, the mean is significantly larger than the median. Generally, it is a good idea to calculate both the mean and median of a variable. If there is a significant difference in the values of the mean and the median, then the
+dataset may have **outliers**. You need to identify these outliers for further analysis.
+
+As you identify the issue with this dataset, a question is whether these outliers are caused by data quality issues or not. As you identify which customers are outliers, you review their residential data source to confirm that their registered address is truly their most up-to-date residential address, not the address they lived at 10 years ago. Once identified, you will use the techniques you learned in previous chapters to update the information and rerun the analysis, thus forming a loop of data cleansing and improvement. This is a very common and useful workflow in the data analytics field. It will also help improve the quality of operational data and reduce unnecessary waste and mistakes by
+the operation team.
+
+But what if the data is correct? How will this information be useful to the business? Always remember that the purpose of data analytics is to provide insight into the business. Now that you know some customers live further from dealerships than most customers, what decisions can you make based on this knowledge? Do you consider the existence of these customers to indicate the need for more dealerships in their area? These observations and analyses are exactly what the management team expects the data analysts to do and should be discussed with the management team.
+
+In this section, you have learned that the calculation of geospatial data requires two particular packages, together with a specific data type, **POINT**. 
+
+In this exercise, you identified the closest dealership for each customer by creating the **POINT** value for each customer and each dealership, calculating the distance between each customer and every possible dealership using the distance calculation function between points, identifying the closest dealership for each customer using the **DISTINCT ON** clause, and finding the average and median distances to a dealership for your customers. You were also introduced to some further discussion on what the result data may bring you, both from a data cleansing perspective and a data analysis perspective. The result of this analysis could provide management with a fresh idea to expand the business.
+
+## Using Array Data types in PostgreSQL
+While the PostgreSQL data types that you have explored so far allow you to store many different types of data, occasionally you will want to store a series of values in a table. For example, you might want
+to store a list of the products that a customer has purchased or the employee ID numbers associated with a specific dealership. For this scenario, PostgreSQL offers the **ARRAY** data type, which allows
+you to store a list of values.
+
+### Starting with Arrays
+**PostgreSQL arrays** allow you to store multiple values in a field in a table. For example, consider the following first record in the **customers** table:
+```
+customer_id | 1
+title | NULL
+first_name | Arlena
+last_name | Riveles
+suffix | NULL
+email | ariveles0@stumbleupon.com
+gender | F
+ip_address | 98.36.172.246
+phone | NULL
+street_address | NULL
+city | NULL
+state | NULL
+postal_code | NULL
+latitude | NULL
+longitude | NULL
+date_added | 2019-12-19 00:00:00
+```
+Each field contains exactly one value (the **NULL** value is still a value); however, there are some attributes that might contain multiple values with an unspecified length. For instance, say you wanted to have a **purchased_products** field. This could contain zero or more values within the field. Imagine the customer purchased the **Lemon** and **Bat Limited Edition** scooters. You could represent that as follows:
+```
+purchased_products | {Lemon,"Bat Limited Edition"}
+```
+You can define an array in a variety of ways. One of the ways to get started is simply by creating an array using the following command:
+```
+SELECT
+ARRAY['Lemon', 'Bat Limited Edition'] AS
+example_purchased_products;
+```
+The following is the output of the code:
+```
+example_purchased_products
+-------------------------------
+{Lemon,"Bat Limited Edition"}
+```
+PostgreSQL knows that the **Lemon** and **Bat Limited Edition** values are of the TEXT data type, so it creates a **TEXT** array to store these values.
+
+While you can create an array for any data type, the array is limited to values for that data type only. So, you could not have an integer value followed by a text value or vice versa (this would produce an error).
+
+You can also create arrays using the **ARRAY_AGG** aggregate function. This aggregate function will create an array of all the values in the group. This is useful when you want to have a consolidated list of sub-attributes for each value in a parent attribute. For example, the following query aggregates all the vehicles for each product type:
+```
+SELECT
+product_type, ARRAY_AGG(DISTINCT model) AS models
+FROM
+products
+GROUP BY
+1;
+```
+The following is the output of the preceding query, in which all the models of **automobile** form an array that corresponds to the automobile product type, and all the models of scooter form an array
+that corresponds to the scooter product type:
+![Output of the ARRAY_AGG function!](images/arrayagg.png)
+You can also specify how to order the elements by including an **ORDER BY** statement in the **ARRAY_AGG** function, as in the following example:
+```
+SELECT
+product_type,
+ARRAY_AGG(model ORDER BY year) AS models
+FROM
+products
+GROUP BY
+1;
+```
+This is the output:
+![Output of the ARRAY_AGG function with ORDER BY!](images/array.png)
+But there might be situations where you would want to reverse this operation. This can be done by using the **UNNEST** function, which creates one row for every value in the array:
+```
+SELECT UNNEST(ARRAY[123, 456, 789]) AS example_ids;
+```
+Here is the output of the preceding query:
+```
+example_ids
+-------------
+123
+456
+789
+(3 rows)
+```
+You can also create an array by splitting a string value using the **STRING_TO_ARRAY** function. A common scenario is that when you use external transaction systems, many systems these days will generate text outputs containing all the information in one string. You will need to break the string into multiple parts and parse each part accordingly. Here is an example:
+```
+SELECT STRING_TO_ARRAY('hello there how are you?', ' ');
+```
+In this example, the sentence is split using the second string (' '), and you end up with the following result:
+```
+string_to_array
+--------------------------
+{hello,there,how,are,you?}
+(1 row)
+```
+Similarly, you can run the reverse operation and concatenate an array of strings into a single string:
+```
+SELECT
+ARRAY_TO_STRING(
+ARRAY['Lemon', 'Bat Limited Edition'], ', '
+) AS example_purchased_products;
+```
+In this example, you can join the individual string with the second string using ',':
+```
+example_purchased_products
+---------------------------
+Lemon, Bat Limited Edition
+```
+There are other functions that allow you to interact with arrays. Here are a few examples of the additional array functionalities that PostgreSQL provides:
+![Examples of additional array functionality!](images/addarr.png)
+
+#### Analyzing Sequences Using Arrays
+In this exercise, you will use arrays to analyze sequences. ZoomZoom sends emails to customers in series. For example, before the December holiday season, they will send out an email providing a product catalog of all the things they sell. During the season, they will send out updates on what product is selling well and what discounts are provided. After the season, they will send out thank you emails and offer further products and discounts. The marketing team wants you to identify the three most common email sequences. You will help them to better understand how different these sequences are by looking at whether these sequences are supersets of one another:
+
+1. First, create a table that represents the email sequence for every customer:
+```
+CREATE TEMP TABLE customer_email_sequences AS (
+SELECT
+customer_id,
+ARRAY_AGG(
+email_subject ORDER BY sent_date
+) AS email_sequence
+FROM
+emails
+GROUP BY
+1
+);
+```
+2. Next, identify the three most common email sequences. Given that you already have the email sequences, you can do this by using **ORDER BY** with **LIMIT 3**. As the **ORDER BY** clause is based on the occurrence of email sequences, the **SELECT** statement will yield the sequences
+with the most frequent ones first. Then with the **LIMIT 3** clause, the statement will return only the top 3 sequences:
+```
+CREATE TEMP TABLE top_email_sequences AS (
+SELECT
+email_sequence,
+COUNT(1) AS occurrences
+FROM
+customer_email_sequences
+GROUP BY
+1
+ORDER BY
+2 DESC
+LIMIT
+3
+);
+SELECT
+email_sequence
+FROM
+top_email_sequences;
+```
+The code will generate three rows. They are too long to display inside one figure so only the first one is shown below:
+![The first result from email sequences!](images/email.png)
+
+3. Lastly, you would want to check which of these arrays is a superset of the other arrays. It is possible that some customers joined later than others, so they only received a part of the email sequence. You need to identify these sub-sequences as a part of the complete email sequence. The only issue is that the email sequence fields are very long and are not intuitive to read through with human eyes. To help with this, it is helpful to give your rows a numeric ID for identification:
+```
+ALTER TABLE
+top_email_sequences
+ADD COLUMN
+id SERIAL PRIMARY KEY;
+```
+4. Next, you can cross-join the table to itself, and use the @> operator to check whether an array containing an email sequence contains another email sequence:
+```
+SELECT
+super_email_seq.id AS superset_id,
+sub_email_seq.id AS subset_id
+FROM
+top_email_sequences AS super_email_seq
+CROSS JOIN
+top_email_sequences AS sub_email_seq
+WHERE
+super_email_seq.email_sequence @> sub_email_seq.email_sequence
+AND
+super_email_seq.id != sub_email_seq.id;
+```
+The following is the output of the code:
+![These results indicate the top email sequences that are supersets of each other!](images/seq.png)
+
+From this, you can gather that the top email sequence contains the second and third most common email sequences, while the third most common email sequence is a superset of the second most common sequence. This type of analysis is generally helpful when looking at what customer
+touchpoints might lead someone to make a purchase or not. For example, some customers joining late may not have received the first email, the holiday season product catalog. But if a similar percentage of these customers and the customers who have received the first email made a purchase after receiving the holiday season discount email, you may reasonably suspect that the holiday season discount email is the main reason for purchase, not the product catalog. This is also known as
+**attribution modeling**.
+
+While arrays are great for lists of values and sequences, the JSON data type can enable you to manage data in key-value pairs, which you will explore in detail in the next section.
+
+## Using JSON Data types in PostgreSQL
+While arrays can be useful for storing a list of values in a single field, sometimes your data structures can be complex. You might want to store multiple values of different types in a single field, and you might want data to be keyed with labels rather than stored sequentially. These are common issues with log-level data, as well as alternative data. For example, a healthcare patient database may contain a field called prescription, which contains all the prescriptions of a patient. Some patients may not have any prescriptions, thus this field may be empty. Other patients may have multiple prescriptions, and each patient's prescription may be different from the others. One patient may have a hypertension drug of 10mg per day. Another may have an insomnia drug of two pills per night. Yet another patient may have both. It is very hard to store these in a predefined format, so they are usually stored as key-value
+pairs using the JSON format.
+
+**JavaScript Object Notation (JSON)** is an open standard text format for storing data of varying complexity. It can be used to represent just about anything, such as the healthcare patient information you saw previously. This is different from the **ARRAY** data type, which can store multiple values. The values must be of the same type. A database table has column names, whereas JSON data has keys. You can use JSON to represent a record from your **customers** table easily by storing column names as keys and row values as values. The **row_to_json** function transforms rows to JSON:
+```
+SELECT row_to_json(c) FROM customers c limit 1;
+```
+Here is the output of the preceding query:
+![A row converted to JSON!](images/json.png)
+This is a little hard to read, but you can add the **pretty_bool** flag to generate a readable version. In the following query, the second parameter of the **row_to_json** function is the **pretty_bool** flag and it is set to **TRUE**:
+```
+SELECT row_to_json(c, TRUE) FROM customers c limit 1;
+```
+Here is the output of the preceding query:
+![JSON output from row_to_json!](images/out.png)
+As you can see, once you reformat the JSON output from the query, **row_to_json** presents a simple, readable, text representation of your row. The JSON structure contains keys and values. In this example, the keys are simply the column names, and the values come from the row values. JSON values can either be numeric values (integers or floats), Boolean values (**True** or **False**), text values (wrapped with double quotation marks), or simply **NULL**.
+
+JSON can also include nested data structures. For example, consider a hypothetical scenario in which you want to include purchased products in the table as well. Say that there are two purchased products, **Lemon** and **Bat Limited Edition**. You could write your JSON document this way:
+```
+{
+"customer_id":1,
+"example_purchased_products":["Lemon", "Bat Limited Edition"]
+}
+```
+Or you could take this example one step further, adding the complete sales records of these two products to this customer's record:
+```
+{
+"customer_id": 7,
+"sales": [
+{
+"product_id": 7,
+"sales_amount": 599.99,
+"sales_transaction_date": "2019-04-25T04:00:30"
+},
+{
+"product_id": 1,
+"sales_amount": 399.99,
+"sales_transaction_date": "2011-08-08T08:55:56"
+},
+{
+"product_id": 6,
+"sales_amount": 65500,
+"sales_transaction_date": "2016-09-04T12:43:12"
+}
+],
+}
+```
+In this example, you have a JSON object with two keys: **customer_id** and **sales**. As you can see, the **sales** key points to a JSON array of values, but each value is another JSON object representing one sale. JSON objects that exist within a JSON object are referred to as **nested JSON**. In this case, you have represented all the sales transactions for a customer using a nested array that contains nested JSON objects for each sale.
+
+While JSON is a universal format for storing data, it is inefficient because everything is stored as one long text string. To retrieve a value associated with a key, you would need to first parse the text, and
+this has a relatively high computational cost associated with it. If you just have a few JSON objects, this performance overhead might not be a big deal. However, it might become a burden if you are trying to perform a JSON operation on a large dataset, such as selecting the JSON object with
+**"customer_id": 7** from millions of other JSON objects in your database.
+
+In the next section, you will learn about JSONB, a binary JSON format that is optimized for PostgreSQL. This data type allows you to avoid a lot of the parsing overhead associated with a standard JSON text string.
+
+### JSONB:Pre-Parsed JSON
+As you saw previously, JSON is stored and transferred as a text string. For the computer to understand what key it contains and what value corresponds to each key, the computer must break up the string into key-value pairs. This will increase the time and resources required to handle JSON data. PostgreSQL provides a data type called JSONB, which is JSON but stored in pre-parsed format. Upon receiving a JSON string for a JSONB column, PostgreSQL will decompose the string into binary format. This is advantageous as there is a significant performance improvement when querying the keys or values in a JSONB field. This is because the keys and values do not need to be parsed; they have already been extracted and stored in an accessible binary format.
+
+**Note**
+JSONB differs from JSON in a few other ways as well. First, in JSONB, you cannot have more than one key with the same name. Second, the key order is not preserved. Third, semantically insignificant details, such as whitespace, are not preserved.
+
+#### Accessing Data from a JSON or JSONB Field
+JSON keys can be used to access the associated value using the **->** operator. Here is an example:
+```
+SELECT
+'{
+"a": 1,
+"b": 2,
+"c": 3
+}'::JSON -> 'b' AS data;
+```
+In this example, you have a three-key JSON value, and you are trying to access the value for the **b** key. The output is a single output: **2**. This is because the **-> 'b'** operation gets the value for the **b**
+key from the preceding JSON format, **{"a": 1, "b": 2, "c": 3}**.
+
+PostgreSQL also allows more complex operations to access the nested JSON format by using the **#>** operator. Look at the following example:
+```
+SELECT
+'{
+  "a": 1,
+"b": [
+{"d": 4},
+{"d": 6},
+{"d": 4}
+],
+"c": 3
+}'::JSON #> ARRAY['b', '1', 'd'] AS data;
+```
+On the right side of the **#>** operator, a text array defines the path to access the desired value. Its operation can be broken down into three steps:
+1. Select the **'b'** value, which is a list of nested JSON objects.
+2. Select the element in the array denoted by **'1'**, which is a nested JSON object **{"d": 6}**. Note that with the suffix **'1'**, the second element is returned because array indexes start at 0.
+3. Select the value associated with the **'d'** key, and the output is **6**.
+These functions work with JSON or JSONB fields (keep in mind that they will run much faster on JSONB fields). JSONB, however, also enables additional functionality. For example, you want to filter rows based on a key-value pair, such as filtering on the **customer_id** field inside the sales transaction record of the JSON format. You could use the **@>** operator, which checks whether the JSONB object on the left contains the key value on the right. Here is an example:
+```
+SELECT
+*
+FROM
+customer_sales
+WHERE
+customer_json @> '{"customer_id":20}'::JSONB;
+```
+The preceding query outputs the corresponding JSONB record:
+```
+"{""email"": ""ihughillj@nationalgeographic.com"", ""phone"": null, ""sales"": [], ""last_name"": ""Hughill"", ""date_added"": ""2012-08-08T00:00:00"", ""first_name"": ""Itch"", ""customer_id"": 20}"
+```
+With JSONB, you can also make your output more readable using the **jsonb_pretty** function:
+```
+SELECT JSONB_PRETTY(customer_json) FROM customer_sales WHERE
+customer_json @> '{"customer_id":20}'::JSONB;
+```
+Here is the output of the preceding query:
+![Output from the JSONB_PRETTY function!](images/jsonb.png)
+
+One issue with JSON format is that it is not accepted by all the data processing software on the market. To make use of this software, you will need to break JSON into a relational dataset, which means the result must be a two-dimensional table with two columns. One column contains the key and the other contains the value. You can also select just the keys from the JSONB field, and unnest them into multiple rows using the **JSONB_OBJECT_KEYS** function. Using this function, you can also extract the value associated with each key from the original JSONB field using the **->** operator. Here is an example:
+```
+SELECT
+JSONB_OBJECT_KEYS(customer_json) AS keys,
+customer_json -> JSONB_OBJECT_KEYS(customer_json) AS values
+FROM
+customer_sales
+WHERE
+customer_json @> '{"customer_id":20}'::JSONB
+;
+```
+The following is the output of the preceding query:
+![Key-value pairs exploded into multiple rows using the JSONB_OBJECT_KEYS
+function!](images/jso.png)
+
+#### Leveraging the JSON Path Language for JSONB Fields
+In addition to the previous functions (such as **JSONB_OBJECT_KEYS**) and operators (such as **->**), PostgreSQL also offers a special JSON path language that can be leveraged to query data within a JSONB field. The first of these functions can check whether a path exists in your JSON object:
+```
+SELECT
+jsonb_path_exists(customer_json, '$.sales[0]')
+FROM
+customer_sales
+LIMIT
+3;
+```
+The following is the output of the document:
+```
+jsnob_path_exists
+-----------------
+t
+t
+t
+(3 rows)
+```
+The **jsonb_path_exists** function has two required parameters: the JSONB value and the JSON path. The JSON path expression uses the JSON path language. Within this JSON path language, $ represents the root of the JSON value, and the .key notation is used to access the value for a given key. 
+In this case, you can access the sales element directly under root using $.sales. The [0] value represents that you want the first value contained in the **sales** array. Alternatively, you could have specified [*] to represent all elements in the **sales** array. This query simply goes through the JSON value in each row, checks whether the JSON value contains a sales field under its root or not, and returns a Boolean value of true or false based on the result. 
+
+You can also add additional filters to this query. For example, you might want to check whether there are any sales with a **sale_amount** value of over $400. You can do this by adding a **filter** expression, which makes SQL return **TRUE** only for the rows containing the path, as well as meeting the filter criteria:
+```
+SELECT
+jsonb_path_exists(
+customer_json,
+'$.sales[*].sales_amount ? (@ > 400)'
+)
+FROM
+customer_sales
+LIMIT
+3;
+```
+The following is the output of the document:
+```
+jsnob_path_exists
+-----------------
+true
+false
+false
+(3 rows)
+```
+In this altered query, you added another element to the path, **.sales_amount**, which gets the sale amount for each sale in the **sales** array. You also added a filter expression using the **?** operator. In
+this case, the **? (@ > 400)** filter expression indicates that you only get true for values greater than 400.
+
+In addition to checking whether a JSON path exists (with or without additional filter criteria), you can also query the result:
+```
+SELECT
+jsonb_path_query(customer_json, '$.sales[0].sales_amount')
+FROM
+customer_sales
+LIMIT
+3;
+```
+The following is the output of the document:
+```
+jsnob_path_query
+-----------------
+479.992
+314.991
+319.992
+(3 rows)
+```
+In this case, the **jsonb_path_query** function grabs the first sale using the positional index, **[0]**, and grabs the value associated with the **sales_amount** key. Similar to **UNNEST**, the **jsonb_path_query** function will expand a result with more than one match to multiple rows:
+```
+SELECT
+jsonb_path_query('{"test":[1, 2, 3]}', '$.test[*]')
+;
+```
+The following is the output of the code:
+```
+jsnob_path_query
+-----------------
+1
+2
+3
+(3 rows)
+```
+**Note**
+If a path does not exist that meets the filter criteria (if any), **jsonb_path_query** will remove that entire row from the output. This is a bit counterintuitive because, normally, row filtering can only happen due to expressions evaluated in the **WHERE** clause, so this functionality can produce unexpected results.
+
+But what if you want to grab the array of sales amounts in cases where there are multiple sales or no sales? In the following examples, you might want to instead use **jsonb_path_query_array**. In the following example, you return the entire array of sales amounts that are greater than $400:
+```
+SELECT
+jsonb_path_query_array(
+customer_json,
+'$.sales[*].sales_amount ? (@ > 400)'
+)
+FROM
+customer_sales
+LIMIT
+3;
+```
+The following is the output of the code:
+```
+jsnob_path_query_array
+-----------------
+[479.992]
+[]
+[]
+(3 rows)
+```
+In this case, the first record contains the $.sales[*].sales_amount path, and has one sale over the threshold, so the **jsonb_path_query_array** function returns the sales value array. The second and third rows had sales in the $.sales[*].sales_amount path but none of the values
+are over the threshold. So, the **jsonb_path_query_array** function returns the **NULL** array for both rows.
+
+#### Creating and Modifying Data in a JSONB Field
+You can also add and remove elements from JSONB. For example, to add a new key-value pair, **"c": 2**, you can do the following:
+```
+select jsonb_insert('{"a":1,"b":"foo"}', ARRAY['c'], '2');
+```
+Here is the output of the preceding query:
+```
+{"a": 1, "b": "foo", "c": 2}
+```
+If you wanted to insert values into a nested JSON object, you could do that too:
+```
+select jsonb_insert('{"a":1,"b":"foo", "c":[1, 2, 3, 4]}',
+ARRAY['c',
+'1'], '10');
+```
+This would return the following output:
+```
+{"a": 1, "b": "foo", "c": [1, 10, 2, 3, 4]}
+```
+n this example, **ARRAY[c, 1]** represents the path where the new value should be inserted. In this case, it first grabs the **c** key and the corresponding array value, then inserts the value (**10**) at position
+**1**.
+To remove a key, you can simply subtract the key that you want to remove. Here is an example:
+```
+SELECT '{"a": 1, "b": 2}'::JSONB - 'b';
+```
+In this case, you have a JSON object with two keys: **a** and **b**. When you subtract **b**, you are left with just the a key and its associated value:
+```
+{"a": 1}
+```
+So far in this section, you have learned the definition of JSON, how to use JSON data in PostgreSQL, the benefits of the JSONB data type, and how to explore and process JSONB data using specific functions. In addition to the methodologies described here, you might want to search through multiple
+layers of nested objects. You will practice these skills in the following exercise.
+
+#### Searching through JSONB
+In this exercise, you will identify the values using data stored as JSONB. Many source systems today will send the transaction information to downstream systems such as data analytics software in the format of a JSON string. You will need to properly identify values from JSON strings before many of the downstream systems can utilize the content. Suppose you want to identify all customers who purchased a Blade scooter; you can do this using data stored as JSONB. Complete the exercise by implementing the following steps:
+
+1. In this step, you will explode each sale into its own row using the **JSONB_ARRAY_ELEMENTS** function:
+```
+CREATE TEMP TABLE customer_sales_single_sale_json AS (
+SELECT
+customer_json,
+JSONB_ARRAY_ELEMENTS(customer_json -> 'sales') AS sale_json
+FROM
+customer_sales
+LIMIT
+10
+);
+```
+2. Filter this output and grab the records where **product_name** is **'Blade'**:
+```
+SELECT DISTINCT
+customer_json
+FROM
+customer_sales_single_sale_json
+WHERE
+sale_json ->> 'product_name' = 'Blade';
+```
+The **->>** operator is similar to the **->** operator, except it returns text output rather than JSONB output. This outputs the following result:
+```
+"{""email"": ""nespinaye@51.la"", ""phone"": ""818-658-6748"", ""sales"": [{""product_id"": 5, ""product_name"": ""Blade"", ""sales_amount"": 559.992, ""sales_transaction_date"": ""2014-07-19T06:33:44""}], ""last_name"": ""Espinay"", ""date_added"": ""2014-07-05T00:00:00"", ""first_name"": ""Nichols"", ""customer_id"": 15}"
+```
+![Records where product_name is Blade!](images/pro.png)
+3. Use the **JSONB_PRETTY()** function to format the output and make the result easier to read:
+```
+SELECT DISTINCT
+JSONB_PRETTY(customer_json)
+FROM
+customer_sales_single_sale_json
+WHERE
+sale_json ->> 'product_name' = 'Blade';
+```
+Here is the output of the preceding query:
+![Format the output using JSONB_PRETTY()!](images/pretty.png)
+You can now easily read the formatted result after using the **JSONB_PRETTY()** function.
+4. Perform this same action with the JSON path expressions:
+```
+CREATE TEMP TABLE blade_customer_sales AS (
+SELECT
+jsonb_path_query(
+customer_json,
+'$ ? (@.sales[*].product_name == "Blade")'
+) AS customer_json
+FROM
+customer_sales
+);
+SELECT
+JSONB_PRETTY(customer_json)
+FROM
+blade_customer_sales;
+```
+5. Finally, count the number of customers who purchased a Blade:
+```
+SELECT
+COUNT(1)
+FROM
+blade_customer_sales;
+```
+The following is the output of the code:
+```
+Count
+------
+986
+(1 row)
+```
+In this exercise, you identified the values using data stored as JSONB. You used **NB_PRETTY()** and **JSONB_ARRAY_ELEMENTS()** to complete this exercise.
+
+Data can be categorized as structured, semi-structured, and unstructured. Relational datasets are the most common type of
+structured data, and JSON is one of the most common types of semi-structured data, which allows you to store complex information using text. You will also often run into data that is stored in an
+unstructured format, such as free speech text. Lots of effort has been put into unstructured text analysis. While it can be difficult to decode these text fields if there is no predefined structure, you can
+often produce meaningful insights from these fields. In the following section, you will look at various techniques for interacting with text fields, and then examine how you can produce analytics-based insights from pure text.
+
+## Text Analytics Using PostgreSQL
+In addition to performing analytics using complex data structures within PostgreSQL, you can also make use of the non-numeric data available. Often, the text contains valuable insights. For instance, you can imagine a salesperson keeping notes on prospective clients, such as "Very promising interaction, the customer is looking to make a purchase tomorrow," is valuable data, as does this note: "The customer is uninterested. They no longer have a need for the product." While this text can be valuable for someone to manually read, it can also be valuable in the analysis. Keywords in these statements, such as "promising," "purchase," "tomorrow," "uninterested," and "no," can be extracted using the right techniques to try to identify top prospects in an automated fashion. 
+
+Any block of text can have keywords that can be extracted to uncover trends or make predictions—for example, in customer reviews, email communications, or sales notes. In many circumstances, text data might be the most relevant data available, and you need to use it to create meaningful insights.
+
+In this section, you will look at how you can use some PostgreSQL functionality to extract keywords that will help you to identify trends. You will also leverage text search capabilities in PostgreSQL to enable rapid searching.
+
+## Tokenizing Text
+While large blocks of text (for example, sentences and paragraphs) can provide useful information to convey to a human reader, there are few analytical solutions that can draw insights from unprocessed text. In almost all these cases, it is helpful to parse text into individual words.
+
+Often, the text is broken down into component tokens, where each token is a sequence of characters that are grouped together to form a semantic unit. Usually, each token is simply a word in the sentence, although in certain cases (such as the word "can't"), your parsing engine might parse two tokens: "can" and "not."
+
+**Note**
+Even cutting-edge **Natural Language Processing (NLP)** techniques usually involve tokenization before the text can be processed. NLP can be useful to run an analysis that requires a deeper understanding of the text.
+
+Words and tokens are useful because they can be matched across documents in your data. This allows you to draw high-level conclusions at the aggregate level. For example, if you have a dataset containing sales notes, and parse out the "interested" token, you can hypothesize that sales notes containing "interested" are associated with customers who are more likely to make a purchase. So, when a new customer comes and makes an initial request, if you see the word "interested" in the note,
+you may want to pay more attention to this request, which has a higher potential of realizing a sale.
+
+PostgreSQL has functionality that makes tokenization easy. You can start by using the **STRING_TO_ARRAY** function, which splits a string into an array using a delimiter, for example, a space:
+```
+SELECT STRING_TO_ARRAY('Danny and Matt are friends.', ' ');
+```
+The following is the output of the preceding query:
+```
+{Danny,and,Matt,are,friends.}
+```
+In this example, the sentence **'Danny and Matt are friends.'** is split using the space character.
+
+In this example, the output includes punctuation, which might be better removed. You can remove punctuation by using the **REGEXP_REPLACE** function. This function accepts four arguments: the text you want to modify, the text pattern that you want to replace, the text that should replace it, and any additional flags (most commonly, you will add the **g** flag, specifying that the replacement should happen globally, or as many times as the pattern is encountered). You can remove the period using a pattern that matches the punctuation defined in the **\!@#$%^&*()-=_+,.<>/?|[]** string and replace it with space or an empty string:
+```
+SELECT
+REGEXP_REPLACE(
+'Danny and Matt are friends.',
+'[!,.?-]',
+' ',
+'g'
+);
+```
+The following is the output of the preceding query:
+```
+Danny and Matt are friends
+```
+As you can see, the punctuation has been removed.
+
+PostgreSQL also includes **stemming** functionality, which is useful for identifying the root stem of the token. **Stem** refers to the base word of a term. For example, the tokens "run," "ran," and "running" contain the same stem, "run," and are not that different in terms of their meaning. The **TS_LEXIZE** function can help you standardize your text by returning the stem of the word, as demonstrated in the following example:
+```
+SELECT TS_LEXIZE('english_stem', 'running');
+```
+The preceding code returns the following:
+```
+{run}
+```
+You can use these techniques to identify tokens in text. You will learn how to apply them in the next exercise.
 
 
 
