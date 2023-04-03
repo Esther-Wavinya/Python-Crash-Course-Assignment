@@ -4424,8 +4424,402 @@ The preceding code returns the following:
 ```
 You can use these techniques to identify tokens in text. You will learn how to apply them in the next exercise.
 
+### Perfoming Text Analytics
+You probably have visited some e-commerce websites that, after a purchase, ask you to leave some feedback. From a technical perspective, this feedback is free-form text containing different words. If you can systematically extract some information, you can help the business team to improve its process and enhance the user experience.
+
+You have similar data in your ZoomZoom database. In this exercise, you want to quantitatively identify keywords that correspond with higher-than-average ratings or lower-than-average ratings using text analytics. In your ZoomZoom database, you have access to some customer survey feedback, along with ratings for how likely the customer is to refer their friends to ZoomZoom. These keywords will allow you to identify key strengths and weaknesses for the executive team to consider in the future. You can follow these steps to complete the exercise:
+
+1. Query the data from the customer survey table to gain some familiarity with the dataset. This will help you to understand the columns in the table and the data inside those columns:
+```
+SELECT * FROM customer_survey limit 5;
+```
+The following is the output of the preceding query:
+![Example customer survey responses in your database!](images/custsurvey.png)
+You can see that you have access to two columns, a numeric rating between 1 and 10 and the **feedback** column in text format.
+
+2. Tokenize the text by parsing it out into individual words and their associated ratings. This will provide you with the tokens in this text and their frequency of appearance. They in turn will provide the foundation for contextual analysis. You can do this using the **STRING_TO_ARRAY** and **UNNEST** array transformations:
+```
+SELECT
+UNNEST(STRING_TO_ARRAY(feedback, ' ')) AS word,
+rating
+FROM
+customer_survey
+LIMIT
+10;
+```
+The following is the output of the preceding query:
+![Transformed text output!](images/text.png)
+As you can see from the output in Figure above, there are still some issues with these tokens that can prevent you from using them in contextual analysis. For example, you see punctuation such as in
+**It's** and capitalization such as in **I** and **It's**. There are also words that do not provide any meaning, such as **the** and **so**, which are called stop words. You need to remove the stop words and
+punctuation, convert the capitalization, and remove forms and tenses to get tokens into their stems. This process is called **standardization**, which will be carried out in Step 3.
+
+3. Standardize the text using the **TS_LEXIZE** function and the English stemmer, **'english_stem'**. You will then remove characters that are not letters in the original text using **REGEXP_REPLACE**. Adding these functions together with the original query will output the following:
+```
+SELECT
+(
+TS_LEXIZE(
+'english_stem',
+UNNEST(
+STRING_TO_ARRAY(
+REGEXP_REPLACE(feedback, '[^a-zA-Z]+', ' ', 'g'),
+' '
+)
+)
+)
+)[1] AS token,
+rating
+FROM
+customer_survey
+LIMIT
+10;
+```
+The following is the output of the code:
+![Output from TS_LEXIZE and REGEX_REPLACE!](images/lex.png)
+
+**Note**
+When you apply these standardization transformations, the outputs are called **tokens** rather than words. Tokens refer to each linguistic unit.
+
+Now, you have the key tokens and their associated ratings. Note that the output of the standardization operation produces **NULL** values for the tokens that have been removed, so you will need to filter out those rating pairs.
+
+4. Find the average rating associated with each token using a **GROUP BY** clause:
+```
+SELECT
+(
+TS_LEXIZE(
+'english_stem',
+UNNEST(
+STRING_TO_ARRAY(
+REGEXP_REPLACE(feedback, '[^a-zA-Z]+', ' ', 'g'),
+' '
+)
+)
+)
+)[1] AS token,
+AVG(rating) AS avg_rating
+FROM
+customer_survey
+GROUP BY
+1
+HAVING
+COUNT(1) >= 3
+ORDER BY
+2
+;
+```
+In this query, you group by the first expression in the **SELECT** statement where you perform the tokenization. You can now take the average rating associated with each token. This is to make sure
+that you only take tokens with more than a couple of occurrences so that you can filter out the noise. In this case, due to the small sample size of feedback responses, you only require that the token occurs
+three or more times **(HAVING COUNT(1) >= 3)**. Finally, you order the results by the second expression—the average score. The result is shown here:
+![Average ratings associated with text tokens!](images/tok.png)
+
+At one end of the spectrum, you see quite a few results that are negative: **pop** probably refers to popping tires, and **batteri** probably refers to issues with battery life. On the positive side, you
+gather that customers respond favorably to discount, sale, and dealership.
+
+5. Verify the assumptions by filtering survey responses that contain these tokens using an **ILIKE** expression. The **ILIKE** expression allows you to match text that contains a pattern. In this example, you are trying to find text that contains the text pop, and the operation is case-insensitive. By wrapping this in **%** symbols, you are specifying that the text can contain any number of characters on the left or right. This is done as follows:
+```
+SELECT
+*
+FROM
+customer_survey
+WHERE
+feedback ILIKE '%pop%';
+```
+The query returns three relevant survey responses:
+![pop!](images/pop.png)
+
+Upon receiving the results of your analysis, you can report the key issues to your product team to review. You can also report the high-level findings that the customers like discounts and the feedback
+have been positive following the introduction of dealerships.
+
+**Note**
+**ILIKE** is similar to another SQL expression: **LIKE**. The **ILIKE** expression is case-insensitive, and the **LIKE** expression is case-sensitive, so typically, it will make sense to use **ILIKE**. In situations where performance is critical, **LIKE** might be slightly faster.
+
+### Performing Text Search
+While you can perform text analytics using aggregations, it might be helpful to instead query your database for relevant posts, similar to how you might query a search engine.
+
+While you can do this using an **ILIKE** expression in your **WHERE** clause, this is not terribly fast or extensible. For example, what if you wanted to search the text for multiple keywords, correct searches
+with misspellings, or handle scenarios where one of the words might be missing altogether?
+
+For these situations, you can use the text search functionality in PostgreSQL.
+
+This functionality scales up to millions of documents when it is fully optimized.
+
+**Note**
+**Documents** represent the individual records in a search database. Each document represents the entity that you want to search for. For example, on a personal website, this might be a blog post that
+includes the title, author, and article for one entry. For a survey, it might include the survey responses or perhaps the survey response combined with the survey question. A document can span multiple
+fields or even multiple tables.
+
+You can start with the **to_tsvector** function, which will perform a similar function to the **TS_LEXIZE function**, but instead of producing a token from a word like the **TS_LEXIZE** function, this **to_tsvector** function will tokenize the entire document. The output data type from this operation is a **tsvector** data type, which is specialized and specifically designed for text search operations. Here is an example:
+```
+SELECT
+feedback,
+to_tsvector('english', feedback) AS tsvectorized_feedback
+FROM
+customer_survey
+LIMIT
+1;
+```
+The query produces the following result:
+![The tsvector tokenized representation of the original feedback!](images/TSVEC.png)
+
+In this case, the feedback, **I highly recommend the lemon scooter. It's so fast** was converted into a tokenized vector: **'fast':10 'high':2 'lemon':5 'recommend':3 'scooter':6**. Like the **TS_LEXIZE** function, less meaningful "stop words" were removed, such as **I, the, It's**, and so. Other words, such as **highly**, were stemmed from their root (**high**). Word order was not preserved. The **to_tsvector** function can also take in JSON or JSONB syntax and tokenize the values (no keys) as a **tsvector** object.
+
+Now that you have broken down the text using the **tsvector** data type with meaningful tokens and their frequency, you will use a **tsquery** data type to perform a search on **tsvector**. The **tsquery** data type defines a search query in the form of a useful data type that PostgreSQL can use to search. For example, suppose you want to construct a search query with the **lemon scooter** keywords. You can write it as follows:
+```
+SELECT to_tsquery('english', 'lemon & scooter');
+```
+Or, if you do not want to specify the Boolean syntax, you can write this:
+```
+SELECT plainto_tsquery('english', 'lemon scooter');
+```
+Both queries produce the same result:
+```
+plainto_tsquery
+----------------
+'lemon' & 'scooter'
+(1 row)
+```
+**Note**
+**to_tsquery** accepts Boolean syntax, such as **|** for **or** and **&** for **and**. It also accepts **!** for **not**.
+
+You can also use Boolean operators to concatenate **tsquery** objects. For example, the **&&** operator will produce a query that requires the left query and the right query, while the **||** operator will produce a query that matches either the left or the right **tsquery** object:
+```
+SELECT
+plainto_tsquery('english', 'lemon')
+&&
+plainto_tsquery('english', 'bat')
+||
+plainto_tsquery('english', 'chi');
+```
+This produces the following result:
+```
+'lemon' & 'bat' | 'chi'
+```
+You can query a **tsvector** object using a **tsquery** object using the @@ operator.
+
+A **tsquery** data type is often used together with the **tsvector** data type for patterned search. For example, you can search all customer feedback for **lemon scooter**:
+```
+SELECT
+*
+FROM
+customer_survey
+WHERE
+to_tsvector('english', feedback)
+@@ plainto_tsquery('english', 'lemon scooter');
+```
+This returns the following three results:
+![Search query output using the PostgreSQL search functionality!](images/sear.png)
+
+So far in this section, you have learned how to handle text strings, how to tokenize and standardize them, and how to search the tokens inside the strings. In the next section, you will learn how to optimize text search on PostgreSQL.
+
+## Optimizing Text Search on PostgreSQL
+While the PostgreSQL search syntax in the previous example is quite straightforward, it needs to convert all text documents into a **tsvector** object every time a new search is performed.
+
+Additionally, the search engine needs to check every document to see whether any content in the document matches the query terms. This process can be tedious. You can improve this in two steps:
+
+1. Store the **tsvector** objects so that they do not need to be recomputed.
+2. Store the tokens and their associated documents in a **Generalized Inverted Index (GIN)**. This is a specific format of PostgreSQL storage that can help you store indexes of complex data such as **tsvector**, similar to how an index in the back of a book has words or phrases and their associated page numbers so that you do not have to check each document to see where it matches.
+
+To do these two things, you will need to precompute and store the **tsvector** objects for each document, then create a GIN based on **tsvector**.
+
+To precompute the **tsvector** objects, use a materialized view. A **materialized view** is defined as a named query, similar to a view. But unlike a regular view, where the results are queried every time, the
+results for a materialized view are stored as if it is a table.
+
+Because a materialized view stores the results in a stored table, it can get out of sync with the underlying tables that it queries. It might be prudent to refresh it, such as dropping the materialized view and recreating it before usage. You can create a materialized view of your survey results using the following query:
+```
+DROP MATERIALIZED VIEW IF EXISTS customer_survey_search;
+CREATE MATERIALIZED VIEW customer_survey_search AS (
+SELECT
+rating,
+feedback,
+to_tsvector('english', feedback)
+||
+to_tsvector('english', rating::text) AS searchable
+FROM
+customer_survey
+);
+```
+You can see that your **searchable** column is composed of two columns: the **rating** and **feedback** columns. There are many scenarios where you will want to search on multiple fields, and you can easily  concatenate multiple **tsvector** objects together with the **||** operator.
+
+You can test that the view worked by querying a row:
+```
+SELECT * FROM customer_survey_search LIMIT 1;
+```
+The query produces the following output:
+![A record from your materialized view with tsvector!](images/reco.png)
+
+In addition to dropping and recreating, you can also use the following syntax to refresh the view (for example, after an insert or update):
+```
+REFRESH MATERIALIZED VIEW customer_survey_search;
+```
+This will recompute the view concurrently while the old copy of the view remains available and unlocked.
+
+Next, you will add the **GIN** index with the following syntax, which will help improve the performance by storing some key information in an organized manner:
+```
+CREATE INDEX
+idx_customer_survey_search_searchable
+ON
+customer_survey_search
+USING GIN(searchable);
+```
+With these two operations (creating the materialized view and creating the GIN index), you can now easily query your feedback table using search terms:
+```
+SELECT
+rating,
+feedback
+FROM
+customer_survey_search
+WHERE
+searchable @@ plainto_tsquery('dealership');
+```
+The following is the output of the preceding query:
+![Output from the materialized view optimized for search!](images/mat.png)
+
+While the query time improvement might be small or non-existent for a small table of 32 rows, these operations greatly improve the speed for large tables (for example, with millions of rows), and enable users to quickly search their database in a matter of seconds. 
+
+In the following activity, you will put these ideas into practice by creating a searchable sales database that will allow you to leverage text queries to find the information that you need.
+
+### Sales Search and Analysis
+In this activity, you will set up a search materialized view and answer some business questions using what you have learned in the previous sections. The head of sales at ZoomZoom has identified a problem: there is no easy way for the sales team to search for a customer. You volunteered to create a proof-of-concept internal search engine that will make all customers searchable by their contact information and the products that they have purchased in the past. Perform the following steps to complete the activity:
+1. Use the **customer_sales** table and create a searchable materialized view with one record per customer. This view should be keyed off the **customer_id** column and searchable on everything related to that customer: name, email address, phone number, and purchased products. It is acceptable to include other fields as well.
+2. A salesperson asks you whether you can use your new search prototype to find a customer by the name of Danny who purchased the Bat scooter. Query your new searchable view using the **Danny Bat88 keywords. How many rows did you get?
+3. The sales team wants to know how common it is for someone to buy a scooter and automobile combination. To do that, join the **products** table to get all distinct pairs of scooters and automobiles.
+4. You can assume that limited-edition releases can be grouped together with their standard model counterpart (for example, **Bat** and **Bat Limited Edition** can be considered the same scooter). Simply filter out **Bat Limited Edition** from the product pairs.
+5. Using the results from the cross join, create a query that counts how many customers were found to match each of the product pairs.
+
+**Expected Output**
+![Customer counts for each scooter and automobile combination!](images/customercounts.png)
+
+**Solution**
+1. First, create the materialized view on the **customer_sales** table. If a view with the same name already exists but is not up to date, execute the **DROP IF EXISTS** statement prior to the **CREATE** statement:
+```
+DROP MATERIALIZED VIEW IF EXISTS customer_search;
+CREATE MATERIALIZED VIEW customer_search AS (
+SELECT
+customer_json -> 'customer_id' AS customer_id,
+customer_json,
+to_tsvector('english', customer_json) AS search_vector
+FROM
+customer_sales
+);
+```
+This gives you a table of the following format (output shortened for readability):
+```
+SELECT * FROM customer_search LIMIT 1;
+```
+The following is the output of the code. Note that the output cells are too large to fit onto a screen so only the first few words are shown in the screenshot:
+![Sample record from the customer_search table!](images/sample.png)
+
+2. You can now search records based on the salesperson's request for a customer named Danny who purchased a Bat scooter using the following query with the **Danny Bat** keywords:
+```
+SELECT
+customer_json
+FROM
+customer_search
+WHERE
+search_vector @@ plainto_tsquery('english', 'Danny Bat');
+```
+This results in eight matching rows:
+![Resulting matches for your Danny Bat query!](images/danny%20bat.png)
+
+3. In this complex task, you need to find customers who match with both a scooter and an automobile. That means you need to perform a query for each combination of scooter and automobile. To get every unique combination of scooter and automobile, you can perform a simple cross join:
+```
+SELECT DISTINCT
+p1.model,
+p2.model
+FROM
+products p1
+CROSS JOIN
+products p2
+WHERE
+p1.product_type = 'scooter'
+AND
+p2.product_type = 'automobile'
+AND
+p1.model NOT ILIKE '%Limited Edition%';
+```
+This produces the following output:
+![All combinations of scooters and automobiles!](images/combin.png)
+
+4. Transform the output into a **tsquery** object:
+```
+SELECT DISTINCT
+plainto_tsquery('english', p1.model)
+&&
+plainto_tsquery('english', p2.model)
+FROM
+products p1
+CROSS JOIN
+products p2
+WHERE
+p1.product_type = 'scooter'
+AND
+p2.product_type = 'automobile'
+AND
+p1.model NOT ILIKE '%Limited Edition%';
+```
+This produces the following result:
+![Queries for each scooter and automobile combination!](images/queri.png)
+
+5. Query your database using each of these **tsquery** objects and count the occurrences for each object:
+```
+SELECT
+  sub.query, 
+  (
+    SELECT 
+      COUNT(1)
+    FROM 
+      customer_search
+    WHERE 
+      customer_search.search_vector @@ sub.query
+  ) 
+FROM (
+  SELECT DISTINCT
+    plainto_tsquery('english', p1.model) 
+      && 
+      plainto_tsquery('english', p2.model) AS query
+  FROM 
+    products p1
+  CROSS JOIN 
+    products p2 
+  WHERE 
+    p1.product_type = 'scooter'
+  AND 
+    p2.product_type = 'automobile'
+  AND 
+    p1.model NOT ILIKE '%Limited Edition%'
+) sub
+ORDER BY 
+  2 DESC;
+```
+The following is the output of the preceding query:
+![Customer counts for each scooter and automobile combination!](images/num.png)
 
 
+While there could be a multitude of factors at play here, you see that **lemon scooter** and the **model sigma** automobile is the combination most frequently purchased together, followed by the **lemon** and **chi** models. **bat** is also fairly frequently purchased with both of those models, as well as the **epsilon** model. The other combinations are much less common, and it seems that customers rarely purchase the **lemon zester**, the **blade**, or the **gamma** model.
+
+
+# Performant SQL
+you will first learn the different ways PostgreSQL performs query planning, in which the PostgreSQL database evaluates the SQL statement and underlying physical implementation and decides how to execute this SQL. You will learn the most basic way of retrieving data, which is
+scanning by sequence. You will then learn the concept of an index and the two most common indexes in PostgreSQL, the B-tree index and the hash index. From there, you will learn how to kill long-running queries to free up resources and allow other queries to run. 
+
+After covering these topics, you will be introduced to functions and triggers. You will learn the definition of functions and the commands to manipulate them. You will also learn the concept of a trigger, a special type of function triggered by an event.
+
+**The Importance of Highly Efficient SQL**
+To understand why performance is so important, consider the following scenarios.
+
+You are performing **post hoc analysis** (that is, analysis after the fact or event). You have completed a study and collected a large dataset of individual observations of various factors or features. One such
+example is described within your ZoomZoom database, which analyzes the sales data for each customer.
+
+With the data collection process, you want to analyze the data for patterns and insights as specified by your problem statement. If your dataset is sufficiently large, you could quickly encounter issues if you
+do not optimize the queries first; the most common issue would simply be the time taken to execute the queries. While this does not sound like a significant issue, unnecessarily long processing times can cause the following problems:
+
+- **Reduction in the depth of the completed analysis**: As each query takes a long time, the practicalities of project schedules may limit the number of queries. So, the depth and complexity of the analysis may be limited.
+- **Limiting the selection of data for analysis**: By artificially reducing the dataset using subsampling, you may be able to complete the analysis in a reasonable time but would have to sacrifice the number of observations being used. This may, in turn, lead to bias being
+accidentally included in the analysis.
+- **Increase in project cost**: The need to use many more resources simultaneously to complete the analysis in a reasonable time would increase the project cost.
+
+Similarly, another potential issue with suboptimal queries is an increase in the required system memory and compute power. This can result in either of the following two scenarios:
+- Failure of the analysis due to insufficient resources
+- Significant increase in the cost of the project to recruit the required resources
 
 
 
