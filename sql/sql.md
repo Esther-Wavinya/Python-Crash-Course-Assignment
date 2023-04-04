@@ -4818,15 +4818,657 @@ accidentally included in the analysis.
 - **Increase in project cost**: The need to use many more resources simultaneously to complete the analysis in a reasonable time would increase the project cost.
 
 Similarly, another potential issue with suboptimal queries is an increase in the required system memory and compute power. This can result in either of the following two scenarios:
+
 - Failure of the analysis due to insufficient resources
 - Significant increase in the cost of the project to recruit the required resources
 
+These days, analysis or queries are increasingly becoming a part of a larger service or product. For instance, when an analysis is being completed as a component of a bidding website that sets the pricing based on previous transactions, database queries may need to be completed in real-time, or at least near real-time. In such cases, optimization and efficiency are key for the product to be a success.
+
+Another such example is a GPS navigation system that incorporates the state of traffic as reported by other users. For such a system to be effective and provide up-to-date navigation information, the database must be analyzed at a rate that keeps up with the speed of the car and the progress of the journey. Any delays in the analysis that would prevent the navigation from being updated in response to traffic would significantly impact the application's commercial viability.
+
+After looking at this example, you can see that efficiency is not only important in an effective and thorough post hoc analysis but also critical when incorporating data analysis as a component of a separate product or service.
+
+While it is certainly not the job of a data scientist or data analyst to ensure that the production process and the database are working at optimal efficiency, it is critical that the queries of the underlying analysis are as effective as possible. If you do not have an efficient and current database in the first place, further refinements will not help to improve the performance of the analysis. In the next section, you will learn the methods for increasing the performance of scans for information throughout
+a database.
+
+## Database Scanning Methods
+You have learned that all database operations are carried out by **database management systems (DBMSs)** such as PostgreSQL. Typically, the DBMS will run these operations in a server's memory, which stores the data to be processed. The problem with this approach is that memory storage is not large enough for modern databases, which are frequently in a scale of gigabytes, if not terabytes. Data in the majority of modern databases is saved on hard disks and uploaded into memory when it is used in a database operation. Yet again, a DBMS can only upload a small part of the database into memory.
+
+Whenever it figures that it needs a certain dataset, it must go to the hard disk to retrieve the unit of storage (which is called a hard disk block) that has the required data in it. The process that the PostgreSQL server uses to search through a database is known as **scanning**.
+
+SQL-compliant databases, such as PostgreSQL, provide several different methods for scanning, searching, and selecting data. The right scan method to use is dependent on the use case and the state of the database at the time of scanning. How many records are in the database? Which fields are you interested in? How many records do you expect to be returned? How often do you need to execute the query? These are just some of the questions that you may want to ask when selecting the most appropriate scanning method.
+
+Throughout this section, you will understand some of the search methods available, how they are used within SQL to execute scans, and several scenarios where they should or should not be used.
+
+These topics will be organized into these sections:
+- Query Planning
+- Index Scanning
+- Effective Index Use
+- Killing Queries
+- Functions and Triggers
+
+### Query Planning
+Before investigating the different methods of executing queries, it is useful to understand how the PostgreSQL server makes various decisions about the types of queries to be used. SQL-compliant databases possess a powerful tool known as a **Query Planner**, which implements a set of features within the server to analyze a request and decide how to execute the statement. The Query Planner optimizes different variables within the request with the aim of reducing the overall execution time.
+
+**Note**
+These variables are described in greater detail in the PostgreSQL documentation (https://www.postgresql.org/docs/current/runtime-config-query.html) and include parameters that correspond to the cost of sequential page fetches, CPU operations, and cache size.
+
+Interpreting the planner is critical if you want to achieve high performance from a database. Doing so allows you to modify the contents and structure of queries to optimize performance. Unfortunately, query planning can require some practice to be comfortable with interpreting the output. Even the PostgreSQL official documentation notes that plan reading is an art that deserves significant attention.
+
+In this chapter, you will not see the details of how a Query Planner implements its analysis since there are core technical details involved. However, it is important to understand how to interpret the plan reported by the Query Planner. You will start with a simple plan and then work your way through more complicated queries and query plans. In the following exercise, you will learn about the **EXPLAIN** command, which displays the plan for a query before it is executed. When you use the **EXPLAIN** command in combination with a SQL statement, the SQL interpreter will not execute the statement, but rather return the steps that are going to be executed (a query plan) by the interpreter to return the desired results.
+
+**Note**
+You have learned how to use the PostgreSQL psql tool and pgAdmin. Query Planner outputs its plan in pure text format. To better display and analyze the output of Query Planner, you will use psql in this part because it can display text in a clearer format, but some screenshots that are easier to read in graphic format will be generated using pgAdmin.
+
+For all exercises and activities in this part, please note that query analysis metrics will vary depending on system configuration. Thus, you may get outputs that may vary from those presented in the exercises and activities. The key point is that the outputs provided in this part demonstrate the working of the principles.
+
+An example of using the **EXPLAIN** command is shown in the following exercise.
+#### Interpreting the Query Planner
+In this exercise, you will interpret a query plan of the **emails** table of the **sqlda** database using the **EXPLAIN** command. Then, you will employ a more involved query, searching for dates between two specific values in the **clicked_date** field.
+
+Follow these steps to complete the exercise:
+1. Open the default command-line interface (CMD or Terminal) and connect to the **sqlda** database:
+```
+psql -h localhost -p 5432 -d sqlda -U postgres
+```
+Upon successful connection, you will be presented with the interface to the PostgreSQL database:
+```
+Type "help" for help
+sqlda=#
+```
+2. Enter the following command to get the query plan of the **emails** table:
+```
+EXPLAIN SELECT * FROM emails;
+```
+Information similar to the following will then be presented:
+```
+Seq Scan on emails (cost=0.00..9605.58 rows=418158 width=79)
+```
+
+This information is returned by the Query Planner; while this is the simplest example possible, there is quite a bit to unpack in the planner information. There is a lot of information returned in a query plan and being able to comprehend the output is vital in tuning the performance of your database queries. 
+
+So, look through the output step by step. The first aspect of the plan that is provided is the type of scan executed by the query:
+```
+Seq Scan on emails (cost=0.00..9605.58 rows=418158 width=79)
+```
+Extracting data using this **SELECT** command directly from the database executes a sequential scan, where the database server traverses through each record in the database and compares each record to the criteria in the sequential scan, returning those records that match the criteria, if there is a **WHERE** clause.
+
+A **sequential scan** is the easiest to understand and is guaranteed to work in every scenario. In some circumstances, the sequential scan is not the fastest or most efficient option; however, it will always produce the correct result. This is essentially a brute-force scan and, thus, can always be called upon to execute a search. In certain situations, a sequential scan is the most efficient method and will be automatically selected by the PostgreSQL server. This is particularly the case if any of the following is true:
+- The table is quite small.
+- The field used in searching contains many duplicates.
+- The planner determines that the sequential scan would be equally or more efficient for the given criteria compared to any other scan.
+
+You will cover more of the scan types later in the text, but **Seq Scan**, or sequential scan, is a simple yet robust type of query.
+
+Following the **Seq Scan** keyword and the table of its target are a series of measurements. The first measurement reported by the planner, as shown here, is the **startup cost**:
+```
+Seq Scan on emails (cost=0.00..9605.58 rows=418158 width=79)
+```
+The **startup cost** is the time expended before the scan starts. This time may be required to first sort the data or complete other preprocessing applications. It is also important to note that the time measured is reported in cost units as opposed to seconds or milliseconds. Often, the cost units are an indication of the number of disk requests or page fetches made, rather than this being a measure in absolute terms.
+The reported cost is typically more useful as a means of comparing the performance of various queries, rather than as an absolute measure of time.
+
+The next number in the sequence indicates the total cost of executing the query if all available rows are retrieved:
+```
+Seq Scan on emails (cost=0.00..9605.58 rows=418158 width=79)
+```
+There are some circumstances in which not all the available rows may be retrieved, but you will learn about that in the *Index Scanning* section of this article.
+
+The next figure in the plan indicates the total number of rows that are available to be returned if the plan is completely executed:
+```
+Seq Scan on emails (cost=0.00..9605.58 rows=418158 width=79)
+```
+The final figure, as suggested by its name, indicates the width of each row in bytes:
+```
+Seq Scan on emails (cost=0.00..9605.58 rows=418158 width=79)
+```
+**Note**
+When executing the **EXPLAIN** command, PostgreSQL does not actually implement the query or return the values. It does, however, return a description, along with the processing costs involved in executing each stage of the plan.
+
+3. Query plan the **emails** table and set the limit to **5**. This will give you an insight into how PostgreSQL adjusts its execution plan when the SQL changes. Enter the following statement in the PostgreSQL interpreter:
+```
+EXPLAIN SELECT * FROM emails LIMIT 5;
+```
+This repeats the previous statement, but the result is limited to the first five records. This query will produce the following output from the planner:
+```
+Limit (cost=0.00..0.11 rows=5 width=79)
+-> Seq Scan on emails (cost=0.00..9605.58 rows=418158 width=79)
+```
+Referring to the preceding output, you can see that there are two individual rows in the plan. This indicates that the plan is composed of two separate steps, with the lower line of the plan being executed first. This lower line is a repeat of what is shown in step 2. The upper line of the plan is the component that limits the result to only **5** rows. The Limit process is an additional cost of the query; however, it is quite insignificant compared to the lower-level plan, which retrieves approximately **418158** rows at a cost of **9605.58** page requests. The **Limit** stage only returns **5** rows at a cost of **0.11** page requests.
+
+**Note**
+The overall estimated cost of a request comprises the time taken to retrieve the information from the disk and the number of rows that need to be scanned. The internal parameters **seq_page_cost** and **cpu_tuple_cost** define the cost of the corresponding operations within the tablespace for the database. While not recommended at this stage, these two variables can be changed to modify the steps prepared by the planner.
+
+For more information, refer to the PostgreSQL documentation:
+https://www.postgresql.org/docs/current/runtime-config-query.html.
+
+4. Now, employ a more involved query, searching for dates between two specific values in the **clicked_date** column. Enter the following statement into the PostgreSQL interpreter:
+```
+EXPLAIN
+SELECT *
+FROM emails
+WHERE clicked_date BETWEEN '2011-01-01' and '2011-02-01';
+```
+This will produce a query plan similar to this:
+```
+Gather (cost=1000.00..9037.59 rows=1 width=79)
+Workers Planned: 2
+-> Parallel Seq Scan on emails (cost=0.00..8037.49 rows=1
+width=79)
+Filter: ((clicked_date >= '2011-01-01 00:00:00'::timestamp
+without time zone) AND (clicked_date <= '2011-02-01
+00:00:00'::timestamp without time zone))
+```
+The first aspect of this query plan to note is that it comprises a few different steps. The lower-level query is similar to the previous query in that it executes a sequential scan. However, rather than limiting the output, you are filtering it based on the timestamp strings provided.
+
+Here, the sequential scan is to be completed in parallel, as indicated by the **Parallel Seq Scan**. PostgreSQL also indicates that it will use two workers to execute this scan. Whether PostgreSQL will use a parallel scan or not depends on the setup of the server, as well as the power of the computer hardware. If PostgreSQL server feels that parallel scan is too complex for the hardware or server to handle, it may choose regular sequential scan, like what you saw in the steps above.
+
+In this example, PostgreSQL believes that parallel scan can provide better performance and decides to utilize two workers for it. Each individual sequence scan should return approximately 54 rows, taking a cost of **8037.49** to complete. The upper level of the plan is a **Gather** state, which is executed at the start of the query. You can see here for the first time that the upfront costs are non-zero (**1000**) and a total of **9037.59**, including the gather and search steps.
+
+**Note**
+In this exercise, you worked with the Query Planner and the output of the **EXPLAIN** command. These relatively simple queries highlighted several features of the SQL Query Planner as well as the detailed information that is provided by it. It will serve you well in your data science endeavors with a good understanding of the Query Planner and the rich information returned. Just remember that this understanding will come with time and practice. Next, you will practice this skill in an activity.
+
+#### Query Planning
+In this activity, you will query the plan for reading and interpreting the information returned by the planner. For instance, say you are still dealing with the ZoomZoom dataset in the **sqlda** database of customer records and your finance team would like to implement a system to regularly generate a report of customer activity in a specific geographical region. To ensure that your report can be run in a timely manner, you need an estimate of how long the SQL queries will take. You will use the **EXPLAIN** command to find out how long some of the report queries will take:
+1. Open PostgreSQL with **psql** and connect to the **sqlda** database.
+2. Use the **EXPLAIN** command to return the query plan to select all available records within the **customers** table.
+```
+EXPLAIN
+SELECT *
+FROM customers;
+```
+
+3. Read the output of the plan and determine the total query cost, the setup cost, the number of rows to be returned, and the width of each row.
+The output is as follows:
+```
+Seq Scan on customers (cost=0.00..1535.00 rows=50000 width=140)
+```
+As such, the total query cost is **1535.00**, the setup cost is **0.00**, the number of rows to be returned is **50000**, and the width of each row is **140**. Your result may have numbers that are slightly different.
+But the general concept of measurements should be the same.
+
+4. Repeat the query from *step 2* of this activity, this time limiting the number of returned records to **15**. Review the updated query plan and compare its output against the output of the previous step, paying special attention to how many steps are involved in the query plan and what the
+cost of the limiting step is.
+```
+EXPLAIN
+SELECT *
+FROM customers
+LIMIT 15;
+```
+The output is as follows:
+```
+Limit (cost=0.00..0.46 rows=15 width=140)
+-> Seq Scan on customers (cost=0.00..1535.00 rows=50000 width=140)
+```
+The lower line in this output is the same as the output of step 3, in which the total query cost is **1535.00**, the setup cost is **0.00**, the number of rows to be returned is **50000**, and the width of each
+row is **140**. For the upper line, the total query cost is **0.46**, the setup cost is **0.00**, the number of rows to be returned is **15**, and the width of each row is **140**.
+
+5. Update the SQL to select all rows where customers live within a latitude of **30** and **40** degrees. Generate the query plan. Compare the total plan cost as well as the number of rows returned by the query to the numbers from previous steps.
+```
+EXPLAIN
+SELECT *
+FROM customers
+WHERE latitude BETWEEN 30 AND 40;
+```
+The output is as follows:
+```
+Seq Scan on customers (cost=0.00..1785.00 rows=26369 width=140)
+Filter: ((latitude >= '30'::double precision) AND (latitude <=
+'40'::double precision))
+```
+The plan in this output has only one step, in which the total query cost is **1785.00**, the setup cost is **0.00**, the number of rows to be returned is **26369**, and the width of the rows is still **140**. Since there is additional filtering involved, the total cost increased but the starting cost remains at zero as there is nothing to prepare in a sequential scan.
 
 
+### Index Scanning
+Index scans improve the performance of your database queries. Index scans differ from sequential scans in that index scans execute a preprocessing step before the search of database records can occur.
+
+The simplest way to think of an index scan is just like the index of a text or reference book. When creating a non-fiction book, a publisher parses through the contents of the book and writes the page numbers corresponding with each alphabetically sorted topic. Just as the publisher goes to the initial effort of creating an index for the reader's reference, you can create a similar index within the PostgreSQL database.
+
+This index within the database creates a prepared and organized set or a subset of references to the data under specified conditions. When a query is executed and an index is present that contains information relevant to the query, the planner may elect to use the data that was preprocessed and
+prearranged within the index. Without using an index, the database needs to repeatedly scan all records, checking each record for the information of interest. Even if all the desired information is at the start of the database, without indexing, the search will still scan through all available records. Clearly, this would take a significantly longer time than necessary.
+
+There are several different indexing strategies that PostgreSQL can use to create more efficient searches, including **B-trees**, **hash indexes**, **generalized inverted indexes (GINs)**, and **generalized search trees (GiSTs)**. Each of these different index types has its own strengths and weaknesses and is therefore used in different situations. One of the most frequently used indexes is the B-tree, which is the default indexing strategy used by PostgreSQL and is available in almost all database software. You will first spend some time investigating the B-tree index, looking at what makes it useful, as well as some of its limitations.
+
+#### The B-Tree Index
+The B-tree index is a type of extended binary search tree and is characterized by the fact that it is a self-balancing structure, maintaining its own data structure for efficient searching. A generic B-tree structure can be found in figure below, in which you can see that each node in the tree has no more than two elements (thus providing balance) and that each node has at most three children. These traits are common among B-trees, where each node is limited to **n** components, thus forcing the split into **n+1** child nodes. The branches of the trees terminate at leaf nodes, which, by definition, have no children:
+![Generic B-tree!](images/btree.png)
+Using the preceding figure as an example, say you were looking for the number **13** in the B-tree index. You would start at the first node and select whether the number was less than **5** or greater than **10**. This would lead you down the right-hand branch of the tree, where you would again choose between less than **15** and greater than **20**. You would then select less than **15** and arrive at the location of **13** in the index.
+
+You can immediately see that this operation would be much faster than looking through all available values. You can also see that for performance, the tree must be balanced to allow for an easy path for
+traversal. Additionally, there must be sufficient information to allow splitting because if you had a tree index with only a few possible values to split on and many samples, you would simply divide the data into a few groups.
+
+Considering B-trees in the context of database searching, you would notice that you require a condition to divide the information (or split) with and need sufficient information for a meaningful split. You do not need to worry about the logic of following the tree, as that will be managed by the
+database itself and can vary depending on the conditions for searching. Even so, it is important for you to understand the strengths and weaknesses of the method to allow you to make appropriate choices when creating the index for optimal performance.
+
+To create an index for a set of data, you use the following syntax:
+```
+CREATE INDEX <index name> ON <table name>(table column);
+```
+
+You can also add additional conditions and constraints to make the index more selective:
+```
+CREATE INDEX <index name> ON <table name>(table column) WHERE
+[condition];
+```
+
+You can also specify the type of index:
+```
+CREATE INDEX <index name> ON <table name> USING TYPE(table column)
+```
+
+PostgreSQL supports multiple index types, such as B-tree, hash, and GiST. For example, say you execute the following query to create a B-tree type index on a column:
+```
+CREATE INDEX ix_customers ON customers USING BTREE(customer_id);
+```
+This outputs the following message:
+```
+CREATE INDEX
+```
+This indicates that the index was created successfully.
+
+In the next exercise, you will start with a simple plan and work your way through more complicated queries and query plans, using index scans.
+
+###### Creating an Index Scan
+In this exercise, you will create a number of different index scans and investigate the performance characteristics of each of the scans.
+
+Continuing with the scenario from Activity of Query Planning, say you had completed your report service but wanted to make the queries faster. You will try to improve this performance using indexing and index scans. You will recall that you are using a table of customer information that includes contact details such as name, email address, phone number, and address information, as well as the latitude and longitude details of their address. Follow these steps to complete this activity:
+
+1. Open PostgreSQL and connect to the **sqlda** database:
+```
+psql -h localhost -p 5432 -d sqlda -U postgres
+```
+
+Upon successful connection, you will be presented with the interface to the PostgreSQL database:
+```
+Type "help" for help
+sqlda=#
+```
+2. Starting with the **customers** database, use the **EXPLAIN** command to determine the cost of the query and the number of rows returned in selecting all the entries with a state value of **FO**:
+```
+EXPLAIN SELECT * FROM customers WHERE state='FO';
+```
+
+The output of the preceding code will be similar to the following. Please note that the actual numbers may vary but the structure will be similar:
+```
+Seq Scan on customers (cost=0.00..1660.00 rows=1 width=140)
+Filter: (state = 'FO'::text)
+```
+Note that there is only **1** row returned and that the setup cost is **0**, but the total query cost is **1660**.
+3. Determine how many unique **state** values there are using the **EXPLAIN** command:
+```
+EXPLAIN SELECT DISTINCT state FROM customers;
+```
+The output is similar to the following:
+```
+HashAggregate (cost=1660.00..1660.51 rows=51 width=3)
+Group Key: state
+-> Seq Scan on customers (cost=0.00..1535.00 rows=50000 width=3)
+```
+So, there are **51** unique values within the **state** column.
+4. Create an index called **ix_state** using the **state** column of **customers**:
+```
+CREATE INDEX ix_state ON customers(state);
+```
+5. Rerun the **EXPLAIN** statement from *step 2*:
+```
+EXPLAIN SELECT * FROM customers WHERE state='FO';
+```
+The output of the preceding code is similar to this:
+```
+Index Scan using ix_state on customers (cost=0.29..8.31 rows=1
+width=140)
+Index Cond: (state = 'FO'::text)
+```
+Notice that an index scan is being used with the index you created in *step 4*. You can also see that you have a non-zero setup cost (**0.29**), but the total cost is much reduced from the previous **1660** to only
+**8.31**. This shows the power of the index scan.
+
+Now, consider a slightly different example, looking at the time it takes to return a search on the **gender** column.
+
+6. Use the **EXPLAIN** command to return the query plan for a search for all records of males within the database:
+```
+EXPLAIN SELECT * FROM customers WHERE gender='M';
+```
+The output is as follows:
+```
+Seq Scan on customers (cost=0.00..1660.00 rows=24957 width=140)
+Filter: (gender = 'M'::text)
+```
+As there is no index on the **gender** column, and the existing index on the **state** column is not relevant, PostgreSQL will still use a sequential scan for this statement.
+
+7. Create an index called **ix_gender** using the **gender** column of **customers**:
+```
+CREATE INDEX ix_gender ON customers(gender);
+```
+8. Confirm the presence of the index using **\d**, which lists all the columns and indexes for the particular table:
+```
+\d customers;
+```
+Scrolling to the bottom, you can see the indexes using the **ix_prefix**, as well as the column from the table used to create the index:
+```
+Table "public.customers"
+Column | Type | Collation | Nullable | Default
+---------------+---------------------------+-----------+----------+-
+--------
+customer_id | bigint | | |
+title | text | | |
+first_name | text | | |
+last_name | text | | |
+suffix | text | | |
+email | text | | |
+gender | text | | |
+ip_address | text | | |
+phone | text | | |
+street_address | text | | |
+city | text | | |
+state | text | | |
+postal_code | text | | |
+latitude | double precision | | |
+longitude | double precision | | |
+date_added | timestamp without time zone | | |
+Indexes:
+"ix_customers_customer_id" btree (customer_id)
+"ix_gender" btree (gender)
+"ix_state" btree (state)
+```
+9. Rerun the **EXPLAIN** statement from *step 6*:
+```
+EXPLAIN SELECT * FROM customers WHERE gender='M';
+```
+The following is the output of the preceding code:
+```
+Bitmap Heap Scan on customers (cost=285.71..1632.67 rows=24957
+width=140)
+Recheck Cond: (gender = 'M'::text)
+-> Bitmap Index Scan on ix_gender (cost=0.00..279.47 rows=24957
+width=0)
+Index Cond: (gender = 'M'::text)
+```
+Notice that the query cost has not changed much, despite the use of the **index** scan. This is because there is insufficient information to create a useful tree within the **gender** column. There are only two possible values, **M** and **F**. The gender index essentially splits the information in two: one branch for males and the other for females. The index has not split the data into branches of the tree well enough
+to gain any benefit. The planner still needs to scan through at least half of the data, and so it is not worth the overhead of the index.
+
+10. Use **EXPLAIN** to return the query plan, searching for latitudes less than **38** degrees and greater than **30** degrees:
+```
+EXPLAIN SELECT * FROM customers WHERE (latitude < 38) AND
+(latitude > 30);
+```
+The following is the output of the preceding code:
+```
+Seq Scan on customers (cost=0.00..1785.00 rows=17944 width=140)
+Filter: ((latitude < '38'::double precision) AND (latitude >
+'30'::double precision))
+```
+Notice that the query is using a sequential scan with a filter because there is no index set on the filter condition, so PostgreSQL has to scan the entire table row by row. The initial sequential scan returns **17944** before the filter and costs **1785** with **0** startup costs.
+
+11. Now create an index on the filtered column so that PostgreSQL has some prior knowledge on how data is stored based on latitude. Create an index called **ix_latitude** using the latitude column of customers:
+```
+CREATE INDEX ix_latitude ON customers(latitude);
+```
+
+12.  Rerun the *query of step 10* and observe the output of the plan:
+```
+Bitmap Heap Scan on customers (cost=384.22..1688.38 rows=17944
+width=140)
+Recheck Cond: ((latitude < '38'::double precision) AND (latitude
+> '30'::double precision))
+-> Bitmap Index Scan on ix_latitude (cost=0.00..379.73
+rows=17944 width=0)
+Index Cond: ((latitude < '((latitude < '38'::double precision) AND (latitude >
+'30'::double precision))
+```
+You can see that this plan is more involved than the previous plan, with a bitmap heap scan and a bitmap index scan being used. A bitmap scan is a frequently used scanning method in PostgreSQL, in which PostgreSQL determines the exact way of index processing. It is closely related to the physical implementation of database storage. As such, explaining the exact details of a bitmap scan is out of the scope of this text.
+
+Now you can get some more information by adding the **ANALYZE** command to **EXPLAIN**.
+13. Use **EXPLAIN ANALYZE** to query plan the content of the **customers** table with latitude values between **30** and **38**:
+```
+EXPLAIN ANALYZE SELECT * FROM customers WHERE (latitude < 38)
+AND (latitude > 30);
+```
+The following output will be displayed:
+```
+Bitmap Heap Scan on customers (cost=384.22..1688.38 rows=17944
+width=140) (actual time=53.413..57.385 rows=17896 loops=1)
+Recheck Cond: ((latitude < '38'::double precision) AND (latitude >
+'30'::double precision))
+Heap Blocks: exact=1033
+-> Bitmap Index Scan on ix_latitude (cost=0.00..379.73 rows=17944
+width=0) (actual time=53.195..53.195 rows=17896 loops=1)
+Index Cond: ((latitude < '38'::double precision) AND (latitude >
+'30'::double precision))
+Planning Time: 0.169 ms
+Execution Time: 57.981 ms
+```
+From the last two rows, you can see that there is **0.169 ms** of planning time and **57.981 ms** of execution time, with the index scan taking almost the same amount of time to execute as the bitmap heat scan takes to start.
+14. Create another index for **latitude** between ****30** and **38** on the **customers** table:
+```
+CREATE INDEX ix_latitude_less ON customers(latitude) WHERE
+(latitude < 38) and (latitude > 30);
+```
+15.  Re-execute the query in *step 10* and compare the query plans:
+```
+Bitmap Heap Scan on customers (cost=298.25..1602.41 rows=17944
+width=140) (actual time=2.316..7.222 rows=17896 loops=1)
+Recheck Cond: ((latitude < '38'::double precision) AND (latitude
+> '30'::double precision))
+Heap Blocks: exact=1033
+-> Bitmap Index Scan on ix_latitude_less (cost=0.00..293.77
+rows=17944 width=0) (actual time=2.165..2.165 rows=17896
+loops=1)
+Planning Time: 0.293 ms
+Execution Time: 7.905 ms
+```
+When you use a generic column index that includes all the elements in the column, the planning time was **0.169 ms** and the execution time was **57.981 ms**. With a more targeted index that only includes a part of the values in the column, the numbers were **0.293 ms** and **7.905 ms**,
+respectively. Using this more targeted index, you were able to shave **50.076 ms** off the execution time at the cost of an additional **0.124 ms** of planning time.
+
+**Note**
+Thus far, you can improve the performance of your query as indexes have made the searching process more efficient. You may have had to pay an upfront cost to create the index, but once created, repeat queries can be executed more quickly. Next, you will practice index scanning in an activity.
+
+#### Implementing Index Scans
+In this activity, you will determine whether index scans can be used to reduce query time. After creating your customer reporting system for the marketing department in Activity of Query Planning, you have received another request to allow records to be identified by their IP address or the associated customer names. You know that there are a lot of different IP addresses, and you need performant searches. Plan out the queries required to search for records by IP address as well as for certain customers with the suffix **Jr** in their name.
+
+Here are the steps to follow:
+1. Use the **EXPLAIN** and **ANALYZE** commands to profile the query plan to search for all records with an IP address of **18.131.58.65**. How long does the query take to plan and execute?
+```
+EXPLAIN ANALYZE
+SELECT *
+FROM customers
+WHERE ip_address = '18.131.58.65';
+```
+The result is as follows:
+```
+"Seq Scan on customers  (cost=0.00..1660.00 rows=1 width=140) (actual time=0.042..7.503 rows=1 loops=1)"
+"  Filter: (ip_address = '18.131.58.65'::text)"
+"  Rows Removed by Filter: 49999"
+"Planning Time: 0.055 ms"
+"Execution Time: 7.518 ms"
+```
+Here, the planning and execution times are **0.055 ms** and **7.518 ms**, respectively.
+2. Create a generic index based on the IP address column.
+```
+CREATE INDEX ix_ip ON customers(ip_address);
+```
+3. Rerun the query in *step 1*. How long does the query take to plan and execute?
+The result is as follows:
+```
+"Index Scan using ix_ip on customers  (cost=0.29..8.31 rows=1 width=140) (actual time=0.039..0.040 rows=1 loops=1)"
+"  Index Cond: (ip_address = '18.131.58.65'::text)"
+"Planning Time: 0.226 ms"
+"Execution Time: 0.057 ms"
+```
+
+4. Create a more detailed index based on the IP address column with the condition that the IP address is **18.131.58.65**.
+```
+CREATE INDEX ix_ip_less ON customers(ip_address)
+WHERE ip_address = '18.131.58.65';
+```
+5. Rerun the query in **step 1**. How long does the query take to plan and execute? What are the differences between each of these queries?
+The following is the output after running query in step 1:
+```
+"Index Scan using ix_ip_less on customers  (cost=0.12..8.14 rows=1 width=140) (actual time=0.017..0.018 rows=1 loops=1)"
+"Planning Time: 0.215 ms"
+"Execution Time: 0.035 ms"
+```
+Now it takes the query **0.215 ms** and **0.035 ms** to plan and execute. As you add more and more restraints to the index definition, the time spent on planning increases because PostgreSQL needs more time to review the index definitions and determine which index to use. But as indexes are
+defined with further details, the execution time became much less.
+
+6. Use the **EXPLAIN ANALYZE** commands to profile the query plan to search for all records with a suffix of **Jr**. How long does the query take to plan and execute?
+```
+EXPLAIN ANALYZE SELECT * FROM customers WHERE suffix = 'Jr';
+```
+The result is as follows:
+```
+"Seq Scan on customers  (cost=0.00..1660.00 rows=92 width=140) (actual time=0.058..10.834 rows=102 loops=1)"
+"  Filter: (suffix = 'Jr'::text)"
+"  Rows Removed by Filter: 49898"
+"Planning Time: 0.091 ms"
+"Execution Time: 10.861 ms"
+```
+
+7. Create a generic index based on the suffix address column.
+```
+CREATE INDEX ix_suffix ON customers(suffix);
+```
+8. Rerun the query of *step 6*. How long does the query take to plan and execute?
+The following is the output after running query in step 6:
+```
+"Bitmap Heap Scan on customers  (cost=5.00..283.86 rows=92 width=140) (actual time=0.090..0.222 rows=102 loops=1)"
+"  Recheck Cond: (suffix = 'Jr'::text)"
+"  Heap Blocks: exact=98"
+"  ->  Bitmap Index Scan on ix_suffix  (cost=0.00..4.98 rows=92 width=0) (actual time=0.073..0.073 rows=102 loops=1)"
+"        Index Cond: (suffix = 'Jr'::text)"
+"Planning Time: 0.274 ms"
+"Execution Time: 0.255 ms"
+```
+Compared to the original execution time of **7.518 ms**, this **0.255 ms** execution time is a huge improvement. The increase in plan time from **0.055 ms** to **0.255 ms** is almost negligible compared to the reduction in execution time.
+
+#### The Hash Index
+The final indexing type you will cover is the hash index. The hash index has only recently gained stability as a feature within PostgreSQL, with previous versions issuing warnings that the feature is unsafe and reporting that the method is typically not as performant as B-tree indexes. At the time of writing, the hash index feature is relatively limited in the comparative statements it can run, with equality (**=**) being the only one available.
+
+So, given that the feature is only just stable and somewhat limited in options for use, why would anyone use it? Well, hash indices can describe large datasets (in the order of tens of thousands of rows or more) using very little data, allowing more of the data to be kept in memory and reducing search times for some queries. This is particularly important for databases that are at least several gigabytes in size.
+
+A hash index is an indexing method that utilizes a hash function to achieve its performance benefits. A hash function is a mathematical function that takes data or a series of data and returns a unique series
+of alphanumeric characters depending upon what information was provided and the unique hash code used.
+
+For instance, say you had a customer named Josephine Marquez. You could pass this information to a hash function, which could produce a hash result such as 01f38e. Suppose you also had records for Josephine's husband, Julio; the corresponding hash for Julio could be 43eb38a. A hash map uses a key-value pair relationship to find data. 
+
+You will use the values of a hash function to provide the key, using the data contained in the corresponding row of the database as the value. As long as the key is unique to the value, you can quickly access the information you require. This method can also reduce the overall size of the index in memory if only the corresponding hashes are stored, thereby dramatically reducing the search time for a query.
+
+Similar to the syntax for creating a B-tree index, a hash index can be created using the following syntax:
+```
+CREATE INDEX <index name> ON <table name> USING HASH(table column)
+```
+The following example shows how to create a hash index on the **gender** columns in the **customers** table:
+```
+CREATE INDEX ix_gender ON customers USING HASH(gender);
+```
+If there is already an index with the same name existing in the database, you can use a **DROP INDEX <index_name>** command to drop and recreate it. In the previous section, it was mentioned that the Query Planner can ignore the indices created if it deems them to not be significantly faster or more appropriate for the existing query. As the hash scan is somewhat limited in use, it may not be uncommon for a different search to ignore the indices. Now, you will perform an exercise to implement the hash index. This will also show you the difference in performance between different index types.
+
+##### Generating Several Hash Indexes to Investigate Performance
+In this exercise, you will generate several hash indexes and investigate the potential performance increases that can be gained from using them. You will start the exercise by rerunning some of the queries of previous exercises and comparing the execution times:
+1. Drop all existing indexes using the **DROP INDEX** command for each of the indexes that you have created previously (**ix_gender, ix_state**, and **ix_latitude_less**); otherwise, you will run into an issue with the following steps: 
+```
+DROP INDEX <index name>;
+```
+2. Use **EXPLAIN** and **ANALYZE** on the **customers** table where the gender is male, but without using a hash index:
+```
+EXPLAIN ANALYZE SELECT * FROM customers WHERE gender='M';
+```
+An output similar to this will be displayed:
+```
+"Seq Scan on customers  (cost=0.00..1660.00 rows=24955 width=140) (actual time=0.010..14.932 rows=24956 loops=1)"
+"  Filter: (gender = 'M'::text)"
+"  Rows Removed by Filter: 25044"
+"Planning Time: 0.134 ms"
+"Execution Time: 16.201 ms"
+```
+From the output, you can see that the estimated planning time is **0.134 ms** and the execution time is **16.201 ms**. Note that you may not have the same time with this query plan, and the plan may not always produce the same values. The key here is to compare the values with the values when
+PostgreSQL uses an index for execution, not the absolute values.
+
+3. Create a B-tree index on the **gender** column and repeat the query to determine the performance using the default index:
+```
+CREATE INDEX ix_gender ON customers USING btree(gender);
+```
+The following is the output of the preceding code:
+```
+"Seq Scan on customers  (cost=0.00..1660.00 rows=24955 width=140) (actual time=0.009..8.952 rows=24956 loops=1)"
+"  Filter: (gender = 'M'::text)"
+"  Rows Removed by Filter: 25044"
+"Planning Time: 0.225 ms"
+"Execution Time: 9.866 ms"
+```
+From the output, you can decipher that the Query Planner has selected the B-tree index, but the costs of the scans do not differ much, although the planning and execution time estimates have been modified. This is because there are only two values in the column. Thus the selectivity of this index is not high.
+
+4. Repeat the following query at least five times manually and observe the time estimates after each execution:
+```
+EXPLAIN ANALYZE SELECT * FROM customers WHERE gender='M';
+```
+The results of the five individual queries should be similar to the one shown previously, just that the planning and execution times differ for each separate execution of the query.
+
+5. You created a B-tree index called **ix_gender** in *step 3*. Now drop the index so that you can create another index with the same name using **HASH** in the next step:
+```
+DROP INDEX ix_gender;
+```
+6. Create a hash index on the **gender** column so that you can compare the hash index with the B-tree index:
+```
+CREATE INDEX ix_gender ON customers USING HASH(gender);
+```
+7. Repeat the query from *step 4* to see the execution time:
+```
+EXPLAIN ANALYZE SELECT * FROM customers WHERE gender='M';
+```
+The following output will be displayed:
+```
+"Seq Scan on customers  (cost=0.00..1660.00 rows=24955 width=140) (actual time=0.008..11.264 rows=24956 loops=1)"
+"  Filter: (gender = 'M'::text)"
+"  Rows Removed by Filter: 25044"
+"Planning Time: 0.135 ms"
+"Execution Time: 12.285 ms"
+```
+PostgreSQL determined that there was no benefit to using the hash index on the **gender** column. So the index was not used by the planner. This is because the **gender** column could have only two possible values and the selectivity is very low.
+
+8. Use the **EXPLAIN ANALYZE** command to profile the performance of the query that selects all customers where the state is **FO**:
+```
+EXPLAIN ANALYZE SELECT * FROM customers WHERE state='FO';
+```
+The following output will be displayed:
+```
+"Seq Scan on customers  (cost=0.00..1660.00 rows=1 width=140) (actual time=16.335..16.336 rows=0 loops=1)"
+"  Filter: (state = 'FO'::text)"
+"  Rows Removed by Filter: 50000"
+"Planning Time: 0.091 ms"
+"Execution Time: 16.356 ms"
+```
+9. Create a B-tree index on the **state** column of the customers table and repeat the query profiling:
+```
+CREATE INDEX ix_state ON customers USING BTREE(state);
+EXPLAIN ANALYZE SELECT * FROM customers WHERE state='FO';
+```
+The following is the output of the preceding code:
+```
+"Index Scan using ix_state on customers  (cost=0.29..8.31 rows=1 width=140) (actual time=0.032..0.032 rows=0 loops=1)"
+"  Index Cond: (state = 'FO'::text)"
+"Planning Time: 0.235 ms"
+"Execution Time: 0.050 ms"
+```
+Here, you can see a significant performance increase due to the B-tree index with a slight setup cost. How does the index scan perform? Since the execution time has dropped from **16.356 ms** to **0.050 ms**, it is reasonable to accept that the planning cost has increased by approximately 300%, from **0.091 ms** to **0.050 ms**.
+
+10. Similar to what you just did to the index on the **gender** column, create a hash index for the **state** column and compare the performance. Drop the **ix_state** B-tree index and create a hash index:
+```
+DROP INDEX ix_state;
+CREATE INDEX ix_state ON customers USING HASH(state);
+```
+11.  Use **EXPLAIN** and **ANALYZE** to profile the performance of the hash scan:
+```
+EXPLAIN ANALYZE SELECT * FROM customers WHERE state='FO';
+```
+The following is the output of the preceding code:
+```
+"Index Scan using ix_state on customers  (cost=0.00..8.02 rows=1 width=140) (actual time=0.008..0.008 rows=0 loops=1)"
+"  Index Cond: (state = 'FO'::text)"
+"Planning Time: 0.192 ms"
+"Execution Time: 0.027 ms"
+```
+You can see that, for this specific query, a hash index is particularly effective, reducing both the planning/setup time and cost of the B-tree index, as well as reducing the execution time to less than **1 ms** from **16.356 ms**.
 
 
-
-
+#### Implementing Hash Indexes
 
 
 
