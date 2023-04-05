@@ -5468,19 +5468,355 @@ The following is the output of the preceding code:
 You can see that, for this specific query, a hash index is particularly effective, reducing both the planning/setup time and cost of the B-tree index, as well as reducing the execution time to less than **1 ms** from **16.356 ms**.
 
 
-#### Implementing Hash Indexes
+
+##### Implementing Hash Indexes 
+In this activity, you will investigate the use of hash indexes to improve performance using the **emails** table from the **sqlda** database. Here is the scenario. You have received another request from the marketing department. This time, they would like you to analyze the performance of an email marketing campaign.
+
+Given that the success rate of email campaigns is low, different emails are sent to multiple customers at a time. Use the **EXPLAIN** and **ANALYZE** commands to determine the planning time and cost, as well as the execution time and cost, of selecting all rows where the email subject is **Shocking Holiday Savings On Electric Scooters**:
+1. Use the **EXPLAIN** and **ANALYZE** commands to determine the planning time and cost, as well as the execution time and cost, of selecting all rows where the email subject is Shocking Holiday Savings On Electric Scooters.
+```
+EXPLAIN ANALYZE
+SELECT * FROM emails
+WHERE email_subject='Shocking Holiday Savings On Electric Scooters';
+```
+The result is as follows:
+```
+"Seq Scan on emails  (cost=0.00..10650.98 rows=20072 width=79) (actual time=9.829..138.334 rows=19873 loops=1)"
+"  Filter: (email_subject = 'Shocking Holiday Savings On Electric Scooters'::text)"
+"  Rows Removed by Filter: 398285"
+"Planning Time: 1.511 ms"
+"Execution Time: 139.370 ms"
+```
+
+2. Create a hash scan on the **email_subject** column.
+```
+CREATE INDEX ix_subject ON emails USING HASH(email_subject);
+```
+3. Repeat *step 1*. Compare the output of the Query Planner without the hash index to the output with the hash index.
+The output after running code in step 1:
+```
+"Bitmap Heap Scan on emails  (cost=647.56..6322.46 rows=20072 width=79) (actual time=1.241..10.942 rows=19873 loops=1)"
+"  Recheck Cond: (email_subject = 'Shocking Holiday Savings On Electric Scooters'::text)"
+"  Heap Blocks: exact=290"
+"  ->  Bitmap Index Scan on ix_subject  (cost=0.00..642.54 rows=20072 width=0) (actual time=1.129..1.130 rows=19873 loops=1)"
+"        Index Cond: (email_subject = 'Shocking Holiday Savings On Electric Scooters'::text)"
+"Planning Time: 0.167 ms"
+"Execution Time: 12.050 ms"
+```
+The hash index clearly has positive impact on the performance of the two queries.
+
+4. Create a hash scan on the **customer_id** column.
+```
+CREATE INDEX ix_customer_id ON emails USING HASH(customer_id);
+```
+
+5. Use **EXPLAIN** and **ANALYZE** to estimate how long it would take to select all rows with a **customer_id** value greater than **100**. Also, determine the type of scan used and why.
+```
+EXPLAIN ANALYZE SELECT * FROM emails WHERE customer_id>100;
+```
+
+The result is as follows:
+```
+"Seq Scan on emails  (cost=0.00..10650.98 rows=417324 width=79) (actual time=0.056..80.613 rows=417315 loops=1)"
+"  Filter: (customer_id > 100)"
+"  Rows Removed by Filter: 843"
+"Planning Time: 0.168 ms"
+"Execution Time: 98.108 ms"
+```
+You can see that PostgreSQL decided to use a sequential scan instead of a hash index because a hash index can only be used with the **=** comparison, not any other operators.
 
 
+**Effective Index Use**
+You will spend some time learning about the appropriate use of indexes to reduce query times since, while indexes may seem like an obvious choice for increasing query performance, this is not always the case.
+
+Consider the following situations:
+- **The field you have used for your index is frequently changing**: In this situation, where you are frequently inserting or deleting rows in a table, the index that you have created may quickly become inefficient as it was constructed for data that is either no longer relevant or has since
+had a change in value.
+
+Consider the index at the back of a book. If you moved the order of the chapters around, the index would no longer be valid and would need to be revised. In such a situation, you may need to periodically re-index the data to ensure the references to the data are up to date.
+
+In SQL, you can rebuild the data indices by using the **REINDEX** command, which leads to a scenario where you will need to consider the cost, means, and strategy of frequent re-indexing versus other performance considerations, such as the query benefits introduced by the index, the size of the database, or even whether changes to the database structure could avoid the problem altogether.
+
+- **The index is out of date and the existing references are either invalid or there are segments of data without an index, preventing the use of the index by the Query Planner**: In general, PostgreSQL will automatically update indexes as the underlying table changes. But there are
+extremely rare cases when the update may not function properly. In such a situation, the index is so old that it cannot be used and thus needs to be updated.
+
+- **You are frequently looking for records containing the same search criteria within a specific field**: In Exercise above on, Creating an Index Scan, you considered an example similar to this when looking for customers within a database whose records contained latitude values of
+less than **38** and greater than **30**, using **SELECT * FROM customers WHERE (latitude < 38) and (latitude > 30)**.
+
+In this example, it may be more efficient to create a partial index using a subset of data, like this: **CREATE INDEX ix_latitude_less ON customers(latitude) WHERE (latitude < 38) and (latitude > 30)**. In this way, the index is only created using the data you are interested in, and is thereby smaller in size, quicker to scan, and easier to maintain, and can also be
+used in more complex queries.
+
+- **The database is not particularly large**: In such a situation, the overhead of creating and using the index may simply not be worth it. Sequential scans, particularly those using data already in RAM, are quite fast, and if you create an index on a small dataset, there is no guarantee that the Query Planner will use it or get any significant benefit from using it.
+
+So far, all the query plans in this text have only dealt with single-table queries. As you can imagine, when the query contains more tables, its query plan will become more complex. This is especially true when you try to join two or more tables because at this point, you are not only picking data from the hard disk but also trying to match data (with a join key) in one table to the data in another. The interpretation and understanding of these plans are no doubt very important but are way beyond the scope of this article. If you are interested in learning more about this topic, you should get yourself familiar with single-table query plans first, then seek further studies on the official PostgreSQL website.
+
+In the next section, you will learn how to speed up normal query execution by terminating long-running queries.
 
 
+### Killing Queries
+Sometimes, you have a lot of data or perhaps insufficient hardware resources, and a query just runs for a very long time. In such a situation, you may need to stop the query—perhaps so you can implement
+an alternative query to get the information you need, but without the delayed response. In this section, you are going to investigate how you can stop hanging or, at least, extremely long-running queries using a secondary PostgreSQL interpreter. The following are some of the commands that you will use to kill queries:
 
+- **pg_sleep** is a command that allows you to tell the SQL interpreter to essentially do nothing for a specified period as defined by the input to the function in seconds.
+- **The pg_cancel_backend** command causes the interpreter to end the query specified by the process ID (**PID**). The process will be terminated cleanly, allowing for appropriate resource cleanup. Clean termination should also be the first preference as it reduces the possibility of data corruption and damage to the database.
+- The **pg_terminate_background** command stops an existing process but, as opposed to **pg_cancel_background**, forces the process to terminate without cleaning up any resources being used by the query. The query is immediately terminated, and data corruption may occur as a result.
+  
+To invoke these commands, you need the command to be evaluated, and one common method is to use a simple **select** statement, such as the following:
+```
+SELECT pg_terminate_background(<PID>);
+```
 
+**PID** is the process ID of the query you would like to terminate. Assuming this runs successfully, it would output the following:
+```
+pg_terminate_backend
+----------------------
+t
+(1 row)
+```
+Now that you have learned how to kill a query in both a clean and a forced manner, you will step through an exercise to kill a long-running query.
 
+#### Canceling a Long Running Query
+In this exercise, you will cancel a long-running query to save time when you are stuck at query execution. You have been lucky enough to receive a large data store and you decide to run what you originally thought was a simple enough query to get some basic descriptive statistics of the data. For some reason, however, the query is taking an extremely long time and you are not even sure that it is running.
 
+You decide it is time to cancel the query, which means you would like to send a stop signal to the query but allow it sufficient time to clean up its resources gracefully. As there may be a wide variety of hardware available to you and the data required to induce a long-running query could be quite a lot to download, you will simulate a long-running query using the **pg_sleep** command.
 
+For this exercise, you will require two separate SQL interpreter sessions running in separate windows, as shown in the following steps:
+1. Launch two separate interpreters by running **psql sqlda**:
+```
+psql -U postgres sqlda
+```
+2. In the first terminal, execute the **sleep** command with a parameter of **1000** seconds:
+```
+SELECT pg_sleep(1000);
+```
+After pressing *Enter*, you should notice that the cursor of the interpreter does not return. Instead, this window seems to be hanging, without responding to any keyboard or mouse inputs.
 
+3. In the second terminal, select the **pid** and **query** columns from the **pg_stat_activity** table where **state** is **active**:
+```
+SELECT pid, query FROM pg_stat_activity WHERE state = 'active';
+```
+The following is the output of the preceding code:
+```
+ pid  |                              query                              
+------+-----------------------------------------------------------------
+ 8307 | SELECT pg_sleep(1000);
+ 8761 | SELECT pid, query FROM pg_stat_activity WHERE state = 'active';
+(2 rows)
+```
 
+4. In the second terminal, pass the PID of the **pg_sleep** query to the **pg_cancel_backend** command to terminate the **pg_sleep** query with a graceful cleanup. Note that the PID (**6336**) might be different in your environment, so use whatever PID you got from the previous step:
+```
+SELECT pg_cancel_backend(6336);
+```
+The following is the output of the preceding code:
+```
+ pg_cancel_backend 
+-------------------
+ f
+(1 row)
+```
+5. Observe the first terminal and notice that the **sleep** command is no longer executing, as indicated by the return message:
+```
+ERROR: canceling statement due to user request
+```
+The above output shows an error as the query was canceled after the user's request.
 
+## Functions and Triggers
+So far in this text, you have discovered how to quantify query performance via the Query Planner. In this section, you will construct reusable queries and statements via functions, as well as automatic function execution via trigger callbacks. The combination of these two SQL features can be used to not only run queries or re-index tables as data is added to, updated in, or removed from the database but also run hypothesis tests and track their results throughout the life of the database.
+
+### Function Definitions
+As in almost all other programming or scripting languages, functions in SQL are contained sections of code that provide a lot of benefits, such as efficient code reuse and simplified troubleshooting processes. You can use functions to repeat or modify statements or queries without re-entering the
+statement each time or searching for its use throughout longer code segments. One of the most powerful aspects of functions is that they allow you to break code into smaller, testable chunks. As the popular computer science expression goes, "If the code is not tested, it cannot be trusted."
+
+So, how do you define functions in SQL? There is a relatively straightforward syntax, with the SQL syntax keywords:
+```
+CREATE FUNCTION some_function_name (function_arguments)
+RETURNS return_type AS $return_name$
+DECLARE return_name return_type;
+BEGIN
+<function statements>;
+RETURN <some_value>;
+END; $return_name$
+LANGUAGE PLPGSQL;
+```
+The following is a short explanation of the functions used in the preceding code:
+- **some_function_name** is the name issued to the function and is used to call the function at later stages.
+- **function_arguments** is an optional list of function arguments. This could be empty, without any arguments provided, if you do not need any additional information to be provided to the function. To provide additional information, you can use either a list of different data
+types as the arguments (such as integer and numeric data types) or a list of arguments with parameter names (such as the **min_val** integer and the **max_val** numeric data type).
+- **return_type** is the data type being returned from the function.
+- **DECLARE return_name return_type** statement is only required if **return_name** is provided, and a variable is to be returned from the function. return_name is the name of the variable to be returned (optional). If **return_name** is not required, this line can be omitted
+from the function definition.
+- **function_statements** are the SQL statements to be executed within the function.
+- **some_value** is the data to be returned from the function.
+- **PLPGSQL** specifies the language to be used in the function. PostgreSQL allows you to use other languages; however, their use in this context lies beyond the scope of this text.
+
+For example, you can create a simple function to add three numbers, as follows:
+```
+CREATE FUNCTION add_three(a integer, b integer, c integer)
+RETURNS integer AS $$
+BEGIN
+RETURN a + b + c;
+END;
+$$ LANGUAGE PLPGSQL;
+```
+
+You can then call it in your queries, as follows:
+```
+SELECT add_three(1, 2, 3);
+```
+
+The following is the output of the code:
+```
+ add_three 
+-----------
+         6
+(1 row)
+```
+Now, you will implement an exercise to create a function without arguments.
+
+#### Creating Functions without Arguments
+In this exercise, you will create the most basic function—one that simply returns a constant value—so you can build up a familiarity with the syntax. You will construct your first SQL function that does not take any arguments as additional information. This function may be used to repeat SQL query statements that provide basic statistics about the data within the tables of the **sqlda** database. These are the steps to follow:
+1. Connect to the **sqlda** database via **psql**.
+2. Create a function called **fixed_val** that does not accept any arguments and returns an integer. This is a multiline process. Enter the following line first:
+```
+CREATE FUNCTION fixed_val()
+RETURNS integer AS $$
+```
+This line starts the function declaration for **fixed_val**, and you can see that there are no arguments to the function, as indicated by the open/closed brackets, **()**, nor any returned variables.
+
+3. Enter the **BEGIN** keyword (notice that as you are not returning a variable, the line containing the **DECLARE** statement has been omitted):
+```
+BEGIN
+```
+4. You want to return the value **1** from this function, so enter the **RETURN 1** statement:
+```
+RETURN 1;
+```
+5. End the function definition:
+```
+END; $$
+```
+6. Add the **LANGUAGE** statement, as shown in the following function definition:
+```
+LANGUAGE PLPGSQL;
+```
+This will complete the function definition.
+7. Now that the function is defined, you can use it. As with almost all other SQL statements you have completed to date, you simply use the **SELECT** command:
+```
+SELECT * FROM fixed_val();
+```
+This will display the following output:
+```
+fixed_val
+---------
+1
+(1 row)
+```
+Notice that the function is called using the open and closed brackets in the **SELECT** statement.
+8. Use **EXPLAIN** and **ANALYZE** in combination with this statement to characterize the performance of the function:
+```
+EXPLAIN ANALYZE SELECT * FROM fixed_val();
+```
+Here is the output of the preceding code:
+```
+"Function Scan on fixed_val  (cost=0.25..0.26 rows=1 width=4) (actual time=0.016..0.016 rows=1 loops=1)"
+"Planning Time: 0.020 ms"
+"Execution Time: 0.027 ms"
+```
+
+Notice that the three rows being referenced in the preceding output refer not to the result of **SELECT * FROM fixed_val();** but rather to the result of the Query Planner. Looking at the first line of the information returned by the Query Planner, you can see that only one row of information is returned from the **SELECT** statement.
+
+9. So far, you have seen how to create a simple function, but simply returning a fixed value is not particularly useful. You will now create a function that determines the number of samples in the **sales** table. Create a function called **num_samples** that does not take any arguments but returns an integer called **total** that represents the number of samples in the **sales** table:
+```
+CREATE FUNCTION num_samples() RETURNS integer AS $total$
+```
+10.  You want to return a variable called **total**, and thus you need to declare it. Declare the **total** variable as an integer:
+```
+DECLARE total integer;
+```
+11.  Enter the **BEGIN** keyword:
+```
+BEGIN
+```
+12.  Enter the statement that determines the number of samples in the table and assigns the result to the **total** variable:
+```
+SELECT COUNT(*) INTO total FROM sales;
+```
+13.  Return the value for **total**:
+```
+RETURN total;
+```
+14.  End the function with the variable name:
+```
+END; $total$
+```
+15.  Add the **LANGUAGE** statement, as shown in the following function definition:
+```
+LANGUAGE PLPGSQL;
+```
+This will complete the function definition, and upon successful creation, the **CREATE_FUNCTION** statement will be shown.
+16. Use the function to determine how many rows or samples there are in the **sales** table:
+```
+SELECT num_samples();
+```
+Here is the output of the preceding code:
+```
+num_samples
+---------
+37711
+(1 row)
+```
+
+You can see that by using the **SELECT** statement in combination with your SQL function, there are **37711** records in the **sales** database.
+
+In this exercise, you have created your first user-defined SQL function and discovered how to create and return information from variables within the function.
+
+In the following activity, you will create a new function that can be called in your queries.
+
+#### Defining a Largest Sale Value Function
+In this activity, you will create a user-defined function so you can calculate the value of the largest sale in a single function call. You will reinforce your knowledge of functions as you create a function that
+determines the value of the largest sale in a database. At this stage, your marketing department is starting to make a lot of data analysis requests, and you need to be more efficient in fulfilling them, as
+they are currently just taking too long.
+
+Perform the following steps:
+1. Connect to the **sqlda** database.
+2. Create a function called **max_sale** that does not take any input arguments but returns a numeric value called **big_sale**.
+```
+CREATE FUNCTION max_sale() RETURNS integer AS $big_sale$
+```
+3. Declare the **big_sale** variable and begin the function.
+```
+DECLARE big_sale numeric;
+BEGIN
+```
+4. Insert the value of the largest sale into the **big_sale** variable.
+```
+SELECT MAX(sales_amount) INTO big_sale FROM sales;
+```
+5. Return the value for **big_sale**.
+```
+RETURN big_sale;
+```
+6. End the function with the **LANGUAGE** statement.
+```
+END; $big_sale$
+LANGUAGE PLPGSQL;
+```
+7. Call the function to find out what the value of the largest sale in the database is.
+```
+SELECT * FROM max_sale();
+```
+The output is as follows:
+```
+Max
+-------
+115000
+(1 row)
+```
+
+In this activity, you created a user-defined function to calculate the largest sale amount from a single function call using the MAX function. Next, you will create a function that takes arguments.
+
+#### Creating Functions with Arguments
 
 
 
