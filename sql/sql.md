@@ -6368,8 +6368,861 @@ You can see that the average quantity is gradually increasing.
 
 
 # Using SQL to Uncover the Truth: A Case Study
+By the end of this topic, you will be able to solve real-world problems outside of those described within this article by using the scientific method and critical thinking. You will be able to analyze your data and convert it into actionable tasks and information. To accomplish these goals, you will examine an extensive and detailed real-world case study of sales data. This case study will not only demonstrate the processes used in SQL analysis to find solutions for actual problems but will also provide you with confidence and experience in solving such problems.
 
+## Introduction
+You have learned a range of new skills (including basic descriptive statistics, SQL commands, and importing and exporting data in PostgreSQL) as well as more advanced methods to optimize and automate SQL (such as functions and triggers). In this final chapter of this workshop, you will combine these new skills with the scientific method and critical thinking to solve a real-world problem and determine the cause of an unexpected drop in sales.
+
+This chapter provides a case study and will help you build your confidence in applying your new SQL skillset to your own problem domains. To solve the problem presented in this case study, you will use the complete range of your newly developed skills, from using basic SQL searches to filtering out the available information to aggregating and joining multiple sets of information and using windowing methods to group the data in a logical manner. By completing case studies such as this, you will refine one of the key tools in your data analysis toolkit, that is, SQL, to provide a boost to your data science career.
+
+## Case Study
+Throughout this text, you will work on a case study. The new ZoomZoom **Bat** Scooter is now available for sale exclusively through its website. Sales are looking good, but suddenly, preorders start plunging by 20% after a couple of weeks. What is going on? As the best data analyst at
+ZoomZoom, you have been assigned to figure this out.
+
+## The Scientific Method
+In this case study, you will be following the scientific method to solve the problem. Here, you will test guesses (or hypotheses) using objectively collected data. The scientific method can be decomposed into the following key steps:
+1. Define the question to answer, which in this case is what caused the drop in sales of the **Bat** Scooter after approximately 2 weeks.
+2. Perform complete background research to gather sufficient information to propose an initial hypothesis for the event or phenomenon.
+3. Construct a hypothesis to explain the event or answer the question.
+4. Define and execute an objective experiment to test the hypothesis. In an ideal scenario, all aspects of the experiment should be controlled and fixed, except for the phenomenon that is being tested under the hypothesis.
+5. Analyze the data that was collected during the experiment.
+6. Report the results of the analysis, which will hopefully explain why there was a drop in the sale of **Bat** Scooters.
+
+**Note**
+In this article, you are completing a post hoc analysis of the data; that is, the event has happened, and all the available data has been collected. Post hoc data analysis is particularly useful when events have been recorded that cannot be repeated or when certain external factors cannot be controlled.
+
+You can perform your analysis with the post hoc analysis data. You will also extract information to support or refute your hypothesis. You will, however, be unable to definitively confirm or reject the hypothesis without practical experimentation. The question that will be the subject of this text and that you need to answer is this: why did the sales of the ZoomZoom **Bat** Scooter drop by approximately 20% after about 2 weeks?
+
+So, to make the process easier, you will first start with the basic SQL skills for data collection and processing.
+
+### Preliminary Data Collection Using SQL Techniques
+In this exercise, you will collect preliminary data using SQL techniques. You have been told that the preorders for the ZoomZoom Bat Scooter were good, but the orders suddenly dropped by 20%. The goal of this exercise is to answer some core questions about Bat Scooter production, such as the
+following:
+- When did production start?
+- How much was the Bat Scooter selling for?
+- How does the Bat Scooter compare with other types of scooters in terms of price?
+Perform the following steps to complete this exercise:
+1. Load the **sqlda** database using psql.
+2. List the **model, base_msrp (MSRP** stands for **manufacturer's suggested retail price**), and **production_start_date** fields within the product table for product types matching **scooter**:
+```
+SELECT
+model, base_msrp, production_start_date
+FROM
+Products
+WHERE
+product_type='scooter'
+ORDER BY
+base_msrp;
+```
+The following table shows the details of all the products with the **scooter** product type:
+```
+         model         | base_msrp | production_start_date 
+-----------------------+-----------+-----------------------
+ Lemon Zester          |    349.99 | 2021-10-01 00:00:00
+ Lemon                 |    399.99 | 2012-10-28 00:00:00
+ Lemon                 |    499.99 | 2015-12-27 00:00:00
+ Bat                   |    599.99 | 2019-06-07 00:00:00
+ Blade                 |    699.99 | 2017-02-17 00:00:00
+ Bat Limited Edition   |    699.99 | 2019-10-13 00:00:00
+ Lemon Limited Edition |    799.99 | 2013-08-30 00:00:00
+(7 rows)
+```
+Looking at the results from the search, you can see two scooter products with **Bat** in the name: **Bat** and **Bat Limited Edition**. The **Bat** Scooter started production on **2019-06-07** (date format: YYYY-MM-DD), with a suggested retail price of $**599.99**, and the **Bat Limited
+Edition** Scooter started production approximately 4 months later, on 2019-10-13, with a price of $**699.99**.
+
+Looking at the product information, you can see that the **Bat** Scooter's price looks different from the others as it is the only scooter with a suggested retail price of $**599.99**. There are others at $**699.99** and above, or $**499.99** and below. But **Bat** Scooter sits right in between.
+
+Similarly, if you consider the production start date in isolation, the original **Bat** Scooter is again unique as it is the only scooter starting production in the second quarter, and one of only two in the first half of the year. All other scooters start production in the second half of the year, with only the Blade Scooter starting production in February.
+
+Now that you have a basic understanding of the products, you would like to see how they perform in the market. To use the sales information in conjunction with the product information available, you also need to get the product ID for each of the scooters.
+
+3. Extract the model names and product IDs for the scooters available within the database. You will need this information to reconcile the product information with the available sales information:
+```
+SELECT
+model, product_id
+FROM
+Products
+WHERE
+product_type='scooter';
+```
+The preceding query yields the productIDs shown in the following table:
+```
+         model         | product_id 
+-----------------------+------------
+ Lemon                 |          1
+ Lemon Limited Edition |          2
+ Lemon                 |          3
+ Blade                 |          5
+ Bat                   |          7
+ Bat Limited Edition   |          8
+ Lemon Zester          |         12
+(7 rows)
+```
+4. In the following steps, you will go through a series of queries for analysis. In the real world, these analytics will involve a lot of research and experimentation and a lot of back and forth to find the proper SQL statements. As such, it is a good habit to save query results that you feel may be helpful, either as a view or directly into a table. In this step, you will insert the results of the preceding query into a new table called **product_names** and then select the newly inserted content:
+```
+SELECT
+model, product_id
+INTO
+product_names
+FROM
+Products
+WHERE
+product_type='scooter';
+SELECT
+*
+FROM
+product_names;
+```
+Inspect the contents of the **product_names** table, as shown here:
+```
+         model         | product_id 
+-----------------------+------------
+ Lemon                 |          1
+ Lemon Limited Edition |          2
+ Lemon                 |          3
+ Blade                 |          5
+ Bat                   |          7
+ Bat Limited Edition   |          8
+ Lemon Zester          |         12
+(7 rows)
+```
+
+**Note**
+By completing this preliminary data collection step, you have obtained the information that is required to collect sales data on the Bat Scooter, as well as other scooter products for comparison. While Exercise above: Preliminary Data Collection Using SQL Techniques involved using the
+simplest SQL commands, it has already yielded some useful information and should not be underestimated.
+
+In *Extracting the Sales Information*, you will try to extract the sales information related to the reduction in sales of the Bat Scooter.
+
+### Extracting the Sales Information
+In this exercise, you will use a combination of simple **SELECT** statements as well as aggregate and window functions to examine the sales data. You can use the preliminary information at hand to extract the **Bat** Scooter sales records and understand what is going on. You have a table, **product_names**, that contains both the model names and product IDs. You will need to combine this information with the sales records and extract only those for the **Bat** Scooter:
+
+1. Load the **sqlda** database with psql.
+2. To get yourself familiarized with the table, list the available fields in the **sqlda** database:
+```
+\d sales
+```
+The preceding query yields the following fields that are present in the database:
+```
+                                 Table "public.sales"
+         Column         |            Type             | Collation | Nullable | Default 
+------------------------+-----------------------------+-----------+----------+---------
+ customer_id            | bigint                      |           |          | 
+ product_id             | bigint                      |           |          | 
+ sales_transaction_date | timestamp without time zone |           |          | 
+ sales_amount           | double precision            |           |          | 
+ channel                | text                        |           |          | 
+ dealership_id          | double precision            |           |          | 
+Triggers:
+    sales_product_sales_amount_msrp AFTER INSERT OR UPDATE ON sales FOR EACH ROW EXECUTE FUNCTION check_sale_amt_vs_msrp()
+
+```
+In this result, you can see references to customer and product IDs, as well as the transaction date, sales information, the sales channel, and the dealership ID.
+
+3. Use an inner join on the **product_id** columns of both the **product_names** table and the **sales** table. From the result of the inner join, select **model, customer_id, sales_transaction_date, sales_amount, channel**, and **dealership_id**, and store the values in a separate table called **product_sales**:
+```
+SELECT
+model,
+customer_id,
+sales_transaction_date::DATE as sales_date,
+sales_amount,
+channel,
+dealership_id
+INTO
+products_sales
+FROM
+Sales
+INNER JOIN
+product_names
+ON
+sales.product_id=product_names.product_id;
+```
+4. Note that the **sales_transaction_date** column is cast from **TIMESTAMP** data type to a **DATE** column **sales_date**. Since you need to determine the sales drop in terms of days, there is no need to keep the data about time. The date would suffice.
    
+5. If you get an error, please drop the **products_sales** table using the following **DROP** query and rerun the code:
+```
+DROP TABLE IF EXISTS products_sales;
+```
+**Note**
+Throughout this text, you will be storing the results of queries and calculations in separate tables as this will allow you to look at the results of the individual steps in the analysis. In a commercial/production setting, you would only store the end result in a separate table, depending on the context of the problem being solved.
+
+6. Look at the first five rows of this new table by using the following query:
+```
+SELECT
+*
+FROM
+products_sales
+LIMIT
+5;
+```
+The following table lists the top five customers who made a purchase. It shows the sale amount and the transaction details, such as the date and time:
+```
+ model | customer_id | sales_date | sales_amount | channel  | dealership_id 
+-------+-------------+------------+--------------+----------+---------------
+ Lemon |       42104 | 2015-01-12 |      319.992 | internet |              
+ Lemon |       41604 | 2014-11-25 |       399.99 | internet |              
+ Lemon |       41575 | 2013-02-06 |      319.992 | internet |              
+ Lemon |       41531 | 2013-05-04 |       399.99 | internet |              
+ Lemon |       41443 | 2014-01-18 |       399.99 | internet |              
+(5 rows)
+```
+7. Select all the information from the **product_sales** table that is available for the **Bat** Scooter and order the sales information by **sales_date** in ascending order. By ordering the data in this way, you can look at the first few days of the sales records in detail:
+```
+SELECT
+*
+FROM
+products_sales
+WHERE
+model='Bat'
+ORDER BY
+sales_date;
+```
+The preceding query generates the following output:
+```
+ model | customer_id | sales_date | sales_amount |  channel   | dealership_id 
+-------+-------------+------------+--------------+------------+---------------
+ Bat   |       42213 | 2019-06-07 |       599.99 | internet   |              
+ Bat   |       45868 | 2019-06-07 |       599.99 | internet   |              
+ Bat   |       11678 | 2019-06-07 |       599.99 | internet   |              
+ Bat   |        4319 | 2019-06-07 |       599.99 | internet   |              
+ Bat   |       31307 | 2019-06-07 |       599.99 | internet   |              
+ Bat   |       40250 | 2019-06-07 |       599.99 | dealership |             4
+ Bat   |       35497 | 2019-06-07 |       599.99 | dealership |             2
+ Bat   |       24125 | 2019-06-07 |       599.99 | dealership |             1
+ Bat   |        4553 | 2019-06-07 |       599.99 | dealership |            11
+ Bat   |        6322 | 2019-06-08 |       599.99 | internet   |              
+ Bat   |       45880 | 2019-06-08 |       599.99 | dealership |             7
+ Bat   |       47790 | 2019-06-08 |       599.99 | dealership |            20
+ Bat   |       43477 | 2019-06-08 |       599.99 | internet   |              
+ Bat   |        6342 | 2019-06-08 |       599.99 | internet   |              
+ Bat   |       46653 | 2019-06-08 |       599.99 | dealership |             6
+ Bat   |       48809 | 2019-06-09 |       599.99 | internet   |              
+ Bat   |       49856 | 2019-06-09 |       599.99 | dealership |            10
+ Bat   |       39653 | 2019-06-09 |       599.99 | dealership |             7
+ Bat   |       49226 | 2019-06-09 |      539.991 | internet   |              
+ Bat   |       43013 | 2019-06-09 |       599.99 | dealership |            16
+ Bat   |       42625 | 2019-06-09 |       599.99 | internet   |              
+-- More --
+```
+8. As you can see, there is one line stating **-- More --**, which means there are more rows in the result set than what is displayed by psql. To find out how many rows are returned in the result set, you will count the number of records available by using the following query:
+```
+SELECT
+COUNT(model)
+FROM
+products_sales
+WHERE
+model='Bat';
+```
+The model count for the **Bat** model is as follows:
+```
+ count 
+-------
+  7328
+(1 row)
+```
+So, you have **7328** sales, beginning on **2019-06-07**. Check the date of the final sales record by performing *step 8*.
+
+9. Determine the last sale date for the **Bat** Scooter by selecting the maximum (using the **MAX** function) for **sales_date**:
+```
+SELECT
+MAX(sales_date)
+FROM
+products_sales
+WHERE
+model='Bat';
+```
+The last sale date is as follows:
+```
+    max     
+------------
+ 2022-01-25
+(1 row)
+```
+The last sale in the database occurred on **2022-01-25**.
+
+10. Now that you know the number of rows, as well as the starting and ending dates of the sales result for the **Bat** Scooter, you can focus on analyzing its sales pattern. You will collect the daily sales volume for the **Bat** Scooter and place it in a new table called **bat_sales** to confirm the information provided by the sales team stating that sales dropped by 20% after the first 2 weeks:
+```
+SELECT
+*
+INTO
+bat_sales
+FROM
+products_sales
+WHERE
+model='Bat'
+ORDER BY
+sales_date;
+```
+11. Now, display the first five records of **bat_sales** ordered by **sales_date**:
+```
+SELECT
+*
+FROM
+bat_sales
+ORDER BY
+sales_date
+LIMIT
+5;
+```
+The following is the output of the preceding code:
+```
+ model | customer_id | sales_date | sales_amount | channel  | dealership_id 
+-------+-------------+------------+--------------+----------+---------------
+ Bat   |       45868 | 2019-06-07 |       599.99 | internet |              
+ Bat   |       11678 | 2019-06-07 |       599.99 | internet |              
+ Bat   |        4319 | 2019-06-07 |       599.99 | internet |              
+ Bat   |       31307 | 2019-06-07 |       599.99 | internet |              
+ Bat   |       42213 | 2019-06-07 |       599.99 | internet |              
+(5 rows)
+```
+12. Now that you have the individual sales information, you will need to start looking at the daily sales as this exercise is aimed at researching daily sales patterns. Create a new table (**bat_sales_daily**) containing the sales transaction dates and a daily count of total sales:
+```
+SELECT
+sales_date,
+COUNT(sales_date)
+INTO
+bat_sales_daily
+FROM
+bat_sales
+GROUP BY
+sales_date
+ORDER BY
+sales_date;
+```
+13. Now that you know the daily number of sales, the next few steps will help you determine/confirm whether there has been a drop in sales. Examine the first **22** records (a little over 3 weeks), as sales were reported to have dropped after approximately the first 2 weeks:
+```
+SELECT
+*
+FROM
+bat_sales_daily
+ORDER BY
+sales_date
+LIMIT
+22;
+```
+This will display the following output:
+```
+ sales_date | count 
+------------+-------
+ 2019-06-07 |     9
+ 2019-06-08 |     6
+ 2019-06-09 |    10
+ 2019-06-10 |    10
+ 2019-06-11 |     5
+ 2019-06-12 |    10
+ 2019-06-13 |    14
+ 2019-06-14 |     9
+ 2019-06-15 |    11
+ 2019-06-16 |    12
+ 2019-06-17 |    10
+ 2019-06-18 |     6
+ 2019-06-19 |     2
+ 2019-06-20 |     5
+ 2019-06-21 |     6
+ 2019-06-22 |     9
+ 2019-06-23 |     2
+ 2019-06-24 |     4
+ 2019-06-25 |     7
+ 2019-06-26 |     5
+ 2019-06-27 |     5
+  2019-06-28 |     3
+(22 rows)
+```
+You can see a drop in sales after **2019-06-17**, since there are seven days in the first 11 rows that record double-digit sales and none over the next 11 days.
+
+**Note**
+At this stage, you can confirm that there has been a drop in sales, although you are yet to precisely quantify the extent of the reduction or the reason for the drop in sales. Well, you will discover the extent of the reduction in the next activity.
+
+### Quantifying the Sales Drop
+In this activity, you will use your knowledge of the windowing methods that you learned about in, Aggregate Functions for Data Analysis, and Window Functions for Data Analysis. In Exercise above, Extracting the Sales Information, you identified the occurrence of the sales drop as being approximately 10 days after launch. Here, you will try to quantify the drop in sales for the **Bat** Scooter.
+
+Perform the following steps to complete this activity:
+1. Load the **sqlda** database with psql.
+2. Using the **OVER** and **ORDER BY** statements, compute the daily cumulative sum of sales. This provides you with a discrete count of sales over a period of time on a daily basis. Insert the results into a new table called **bat_sales_growth**.
+```
+SELECT
+*,
+sum(count) OVER (ORDER BY sales_date)
+INTO
+bat_sales_growth
+FROM
+bat_sales_daily;
+```
+3. Compute a seven-day **lag** of the **sum** column, and then insert all the columns of **bat_sales_daily** and the new **lag** column into a new table, **bat_sales_daily_delay**. This **lag** column indicates the sales amount a week prior to the given record, allowing you to compare sales with the previous week.
+```
+SELECT
+*,
+lag(sum, 7) OVER (ORDER BY sales_date)
+INTO
+bat_sales_daily_delay
+FROM
+bat_sales_growth;
+```
+4. Inspect the first 15 rows of **bat_sales_growth**.
+```
+SELECT
+*
+FROM
+bat_sales_daily_delay
+ORDER BY
+Sales_date
+LIMIT
+15;
+```
+The result is as follows:
+```
+ sales_date | count | sum | lag 
+------------+-------+-----+-----
+ 2019-06-07 |     9 |   9 |    
+ 2019-06-08 |     6 |  15 |    
+ 2019-06-09 |    10 |  25 |    
+ 2019-06-10 |    10 |  35 |    
+ 2019-06-11 |     5 |  40 |    
+ 2019-06-12 |    10 |  50 |    
+ 2019-06-13 |    14 |  64 |    
+ 2019-06-14 |     9 |  73 |   9
+ 2019-06-15 |    11 |  84 |  15
+ 2019-06-16 |    12 |  96 |  25
+ 2019-06-17 |    10 | 106 |  35
+ 2019-06-18 |     6 | 112 |  40
+ 2019-06-19 |     2 | 114 |  50
+ 2019-06-20 |     5 | 119 |  64
+ 2019-06-21 |     6 | 125 |  73
+(15 rows)
+```
+
+5. Compute the sales growth as a percentage, comparing the current sales volume to that of a week prior. Insert the resulting table into a new table called **bat_sales_delay_vol**.
+```
+SELECT
+*,
+(sum-lag)/lag AS volume
+INTO
+bat_sales_delay_vol
+FROM
+bat_sales_daily_delay;
+```
+
+
+6. Compare the first 22 values of the **bat_sales_delay_vol** table to ascertain a sales drop.
+```
+SELECT * FROM bat_sales_delay_vol LIMIT 22;
+```
+The result is as follows:
+```
+ sales_date | count | sum | lag |         volume         
+------------+-------+-----+-----+------------------------
+ 2019-06-07 |     9 |   9 |     |                       
+ 2019-06-08 |     6 |  15 |     |                       
+ 2019-06-09 |    10 |  25 |     |                       
+ 2019-06-10 |    10 |  35 |     |                       
+ 2019-06-11 |     5 |  40 |     |                       
+ 2019-06-12 |    10 |  50 |     |                       
+ 2019-06-13 |    14 |  64 |     |                       
+ 2019-06-14 |     9 |  73 |   9 |     7.1111111111111111
+ 2019-06-15 |    11 |  84 |  15 |     4.6000000000000000
+ 2019-06-16 |    12 |  96 |  25 |     2.8400000000000000
+ 2019-06-17 |    10 | 106 |  35 |     2.0285714285714286
+ 2019-06-18 |     6 | 112 |  40 |     1.8000000000000000
+ 2019-06-19 |     2 | 114 |  50 |     1.2800000000000000
+ 2019-06-20 |     5 | 119 |  64 | 0.85937500000000000000
+ 2019-06-21 |     6 | 125 |  73 | 0.71232876712328767123
+ 2019-06-22 |     9 | 134 |  84 | 0.59523809523809523810
+ 2019-06-23 |     2 | 136 |  96 | 0.41666666666666666667
+ 2019-06-24 |     4 | 140 | 106 | 0.32075471698113207547
+ 2019-06-25 |     7 | 147 | 112 | 0.31250000000000000000
+ 2019-06-26 |     5 | 152 | 114 | 0.33333333333333333333
+ 2019-06-27 |     5 | 157 | 119 | 0.31932773109243697479
+ 2019-06-28 |     3 | 160 | 125 | 0.28000000000000000000
+(22 rows)
+```
+While the count and cumulative **sum** columns are reasonably straightforward, why do you need the **lag** and **volume** columns? That is because to look for a drop in sales growth, you need to first calculate the growth. Growth is calculated by comparing the daily sum of sales to the same values seven days earlier (the lag). By subtracting the sum and lag values and dividing by the lag, you obtain the volume value and can determine sales growth compared to the previous week of the sales
+transaction. Then, you will observe the trend in growth and identify possible drops.
+
+Notice that the sales volume on **2019-06-14** is **700%** greater than the launch date of **2019-06-07**. By **2019-06-17**, the volume has doubled compared to the week prior. As time passes, this relative difference begins to decrease dramatically. By the end of June, the volume is 28% higher than the week prior. At this stage, you can observe and confirm the presence of a reduction in sales growth after the first 2 weeks. In the next exercise, you will attempt to explain the causes of the reduction.
+
+### Launch Timing Analysis
+In this exercise, you will try to identify the causes of a sales drop. Now that you have confirmed the presence of the sales growth drop, you will try to explain the cause of the event. You will test the hypothesis that the timing of the scooter launch is the reason for the reduction in sales. Remember from Exercise above, Preliminary Data Collection Using SQL Techniques, that the ZoomZoom **Bat** Scooter launched on **2019-06-07**. Perform the following steps to complete this exercise:
+
+1. Load the **sqlda** database from psql.
+2. Examine the other products in the database. To determine whether the launch date is the reason for the sales drop, you need to compare the ZoomZoom **Bat** Scooter to other scooter products according to the launch date. Execute the following query to check the launch dates:
+```
+SELECT * FROM products;
+```
+The result shows the launch dates for all the products:
+```
+ product_id |         model         | year | product_type | base_msrp | production_start_date | production_end_date 
+------------+-----------------------+------+--------------+-----------+-----------------------+---------------------
+          1 | Lemon                 | 2013 | scooter      |    399.99 | 2012-10-28 00:00:00   | 2015-02-03 00:00:00
+          2 | Lemon Limited Edition | 2014 | scooter      |    799.99 | 2013-08-30 00:00:00   | 2013-11-24 00:00:00
+          3 | Lemon                 | 2016 | scooter      |    499.99 | 2015-12-27 00:00:00   | 2021-08-24 00:00:00
+          5 | Blade                 | 2017 | scooter      |    699.99 | 2017-02-17 00:00:00   | 2017-09-23 00:00:00
+          7 | Bat                   | 2019 | scooter      |    599.99 | 2019-06-07 00:00:00   | 
+          8 | Bat Limited Edition   | 2020 | scooter      |    699.99 | 2019-10-13 00:00:00   | 
+         12 | Lemon Zester          | 2022 | scooter      |    349.99 | 2021-10-01 00:00:00   | 
+          4 | Model Chi             | 2017 | automobile   | 115000.00 | 2017-02-17 00:00:00   | 2021-08-24 00:00:00
+          6 | Model Sigma           | 2018 | automobile   |  65500.00 | 2017-12-10 00:00:00   | 2021-05-28 00:00:00
+          9 | Model Epsilon         | 2020 | automobile   |  35000.00 | 2019-10-13 00:00:00   | 
+         10 | Model Gamma           | 2020 | automobile   |  85750.00 | 2019-10-13 00:00:00   | 
+         11 | Model Chi             | 2022 | automobile   |  95000.00 | 2021-10-01 00:00:00   | 
+(12 rows)
+```
+All the other products were launched outside of the second quarter, unlike the **Bat** Scooter, which was launched in June.
+
+3. List all the scooters from the **products** table, since you are only interested in comparing scooters:
+```
+SELECT
+*
+FROM
+products
+WHERE
+product_type='scooter';
+```
+The result shows all the information for products with the product type of **scooter**:
+```
+ product_id |         model         | year | product_type | base_msrp | production_start_date | production_end_date 
+------------+-----------------------+------+--------------+-----------+-----------------------+---------------------
+          1 | Lemon                 | 2013 | scooter      |    399.99 | 2012-10-28 00:00:00   | 2015-02-03 00:00:00
+          2 | Lemon Limited Edition | 2014 | scooter      |    799.99 | 2013-08-30 00:00:00   | 2013-11-24 00:00:00
+          3 | Lemon                 | 2016 | scooter      |    499.99 | 2015-12-27 00:00:00   | 2021-08-24 00:00:00
+          5 | Blade                 | 2017 | scooter      |    699.99 | 2017-02-17 00:00:00   | 2017-09-23 00:00:00
+          7 | Bat                   | 2019 | scooter      |    599.99 | 2019-06-07 00:00:00   | 
+          8 | Bat Limited Edition   | 2020 | scooter      |    699.99 | 2019-10-13 00:00:00   | 
+         12 | Lemon Zester          | 2022 | scooter      |    349.99 | 2021-10-01 00:00:00   | 
+(7 rows)
+```
+To test the hypothesis that the time of year had an impact on sales performance, you require a scooter model to use as the control or reference group. In an ideal world, you could launch the ZoomZoom
+**Bat** Scooter in a different location or region, but just at a different time, and then compare the two. However, this is not possible here.
+
+Instead, you will choose a similar scooter that was launched at a different time. There are different options in the product database, each with its own similarities and differences from the experimental group (ZoomZoom Bat Scooter). You could choose the Bat Limited Edition Scooter as the control group and use it for comparison. As you can see from the preceding query result, it is slightly more expensive, but it was launched only 4 months after the **Bat** Scooter.
+
+Looking at its name, the **Bat Limited Edition** Scooter seems to share most features with ZoomZoom **Bat** Scooter except for a few extra features because it is limited edition.
+
+4. Select the first five rows of the **sales** database:
+```
+SELECT * FROM sales LIMIT 5;
+```
+The sales information for the first five customers is as follows:
+```
+ customer_id | product_id | sales_transaction_date | sales_amount | channel  | dealership_id 
+-------------+------------+------------------------+--------------+----------+---------------
+       27275 |          7 | 2021-03-16 08:40:24    |      539.991 | internet |              
+        2017 |          7 | 2019-12-27 07:36:20    |       599.99 | internet |              
+        7213 |          7 | 2021-12-04 18:43:30    |      479.992 | internet |              
+       13194 |          7 | 2019-10-26 12:16:05    |      539.991 | internet |              
+       34454 |          7 | 2020-01-03 04:11:06    |      479.992 | internet |              
+(5 rows)
+```
+5. Select the **model** and **sales_transaction_date** columns from both the products and sales tables for the **Bat Limited Edition** Scooter. Store the results in a table, **bat_ltd_sales**, ordered by the **sales_transaction_date column**, from the earliest date to the latest:
+```
+SELECT
+products.model,
+sales.sales_transaction_date
+INTO
+bat_ltd_sales
+FROM
+sales
+INNER JOIN
+products
+ON
+sales.product_id=products.product_id
+WHERE
+sales.product_id=8
+ORDER BY
+sales.sales_transaction_date;
+```
+Here is the output:
+```
+SELECT 5803
+```
+6. Select the first five lines of **bat_ltd_sales** using the following query:
+```
+SELECT * FROM bat_ltd_sales LIMIT 5;
+```
+The following table shows the transaction details for the first five entries of **Bat Limited Edition**:
+```
+        model        | sales_transaction_date 
+---------------------+------------------------
+ Bat Limited Edition | 2019-10-13 01:49:02
+ Bat Limited Edition | 2019-10-13 09:42:37
+ Bat Limited Edition | 2019-10-13 10:48:31
+ Bat Limited Edition | 2019-10-13 12:22:41
+ Bat Limited Edition | 2019-10-13 13:51:34
+(5 rows)
+```
+7. Calculate the total number of sales for **Bat Limited Edition**. You can check this by using the **COUNT** function:
+```
+SELECT COUNT(model) FROM bat_ltd_sales;
+```
+Here is the total sales count:
+```
+ count 
+-------
+  5803
+(1 row)
+```
+This is compared to the original **Bat** Scooter, which sold 7,328 units.
+8. Check the transaction details of the last Bat Limited Edition sale. You can check this by using the **MAX** function:
+```
+SELECT MAX(sales_transaction_date) FROM bat_ltd_sales;
+```
+The transaction details of the last **Bat Limited Edition** product are as follows:
+```
+         max         
+---------------------
+ 2022-01-25 15:08:03
+(1 row)
+```
+9. Adjust the table to cast the transaction date column as a date, discarding the time information as you are only interested in the date of the sale, not the date and time of the sale. To do this, write the following query:
+```
+ALTER TABLE
+bat_ltd_sales
+ALTER COLUMN
+sales_transaction_date TYPE date;
+```
+10.  Again, select the first five records of **bat_ltd_sales** to check that the type of the **sales_transaction_date** column is changed to date:
+```
+SELECT
+*
+FROM
+bat_ltd_sales
+LIMIT
+5;
+```
+The following table shows the first five records of **bat_ltd_sales**:
+```
+        model        | sales_transaction_date 
+---------------------+------------------------
+ Bat Limited Edition | 2019-10-13
+ Bat Limited Edition | 2019-10-13
+ Bat Limited Edition | 2019-10-13
+ Bat Limited Edition | 2019-10-13
+ Bat Limited Edition | 2019-10-13
+(5 rows)
+```
+11. Similar to the standard **Bat** Scooter, create a count of sales of the **Bat Limited Edition** Scooter sale on a daily basis. Insert the results into the **bat_ltd_sales_count** table by using the following query:
+```
+SELECT
+sales_transaction_date,
+count(sales_transaction_date)
+INTO
+bat_ltd_sales_count
+FROM
+bat_ltd_sales
+GROUP BY
+sales_transaction_date
+ORDER BY
+sales_transaction_date;
+```
+12. List the sales count of all the **Bat Limited** products using the following query:
+```
+SELECT
+*
+FROM
+bat_ltd_sales_count
+ORDER BY
+sales_transaction_date;
+```
+The sales count contains many rows. Here are the first 17 rows:
+```
+ sales_transaction_date | count 
+------------------------+-------
+ 2019-10-13             |     6
+ 2019-10-14             |     2
+ 2019-10-15             |     1
+ 2019-10-16             |     4
+ 2019-10-17             |     5
+ 2019-10-18             |     6
+ 2019-10-19             |     5
+ 2019-10-20             |     4
+ 2019-10-21             |     6
+ 2019-10-22             |     2
+ 2019-10-23             |     2
+ 2019-10-24             |     2
+ 2019-10-25             |     4
+ 2019-10-26             |     4
+ 2019-10-27             |     5
+ 2019-10-28             |     1
+ 2019-10-29             |     3
+ 2019-10-30             |     8
+ 2019-10-31             |     4
+ 2019-11-01             |     7
+ 2019-11-02             |     7
+ 2019-11-03             |     8
+ 2019-11-04             |     3
+ 2019-11-05             |     7
+ 2019-11-06             |     4
+ 2019-11-07             |     9
+ 2019-11-08             |     3
+ 2019-11-09             |     6
+ 2019-11-10             |     3
+ 2019-11-11             |     2
+ 2019-11-12             |     5
+ 2019-11-13             |     7
+ 2019-11-14             |     2
+ 2019-11-15             |     5
+ 2019-11-16             |     7
+ 2019-11-17             |     6
+ 2019-11-18             |     3
+ 2019-11-19             |     9
+ 2019-11-20             |     5
+ 2019-11-21             |     6
+ 2019-11-22             |     3
+ 2019-11-23             |     7
+ 2019-11-24             |     1
+ 2019-11-25             |     6
+```
+13. Compute the cumulative sum of the daily sales figures and insert the resulting table into **bat_ltd_sales_growth**:
+```
+SELECT
+*,
+sum(count) OVER (ORDER BY sales_transaction_date)
+INTO
+bat_ltd_sales_growth
+FROM
+bat_ltd_sales_count;
+```
+14. Select the first 22 days of sales records from **bat_ltd_sales_growth**:
+```
+SELECT
+*
+FROM
+bat_ltd_sales_growth
+ORDER BY
+sales_transaction_date
+LIMIT
+22;
+```
+The following table displays the first 22 records of sales growth:
+```
+ sales_transaction_date | count | sum 
+------------------------+-------+-----
+ 2019-10-13             |     6 |   6
+ 2019-10-14             |     2 |   8
+ 2019-10-15             |     1 |   9
+ 2019-10-16             |     4 |  13
+ 2019-10-17             |     5 |  18
+ 2019-10-18             |     6 |  24
+ 2019-10-19             |     5 |  29
+ 2019-10-20             |     4 |  33
+ 2019-10-21             |     6 |  39
+ 2019-10-22             |     2 |  41
+ 2019-10-23             |     2 |  43
+ 2019-10-24             |     2 |  45
+ 2019-10-25             |     4 |  49
+ 2019-10-26             |     4 |  53
+ 2019-10-27             |     5 |  58
+ 2019-10-28             |     1 |  59
+ 2019-10-29             |     3 |  62
+ 2019-10-30             |     8 |  70
+ 2019-10-31             |     4 |  74
+ 2019-11-01             |     7 |  81
+ 2019-11-02             |     7 |  88
+ 2019-11-03             |     8 |  96
+(22 rows)
+```
+15. Compare this sales record with the one for the original Bat Scooter sales using the following code. The table is from Activity, Quantifying the Sales Drop:
+```
+SELECT
+*
+FROM
+bat_sales_growth
+ORDER BY
+sales_date
+LIMIT
+22;
+```
+The following table shows the sales details for the first 22 records of the **bat_sales_growth** table:
+```
+ sales_date | count | sum 
+------------+-------+-----
+ 2019-06-07 |     9 |   9
+ 2019-06-08 |     6 |  15
+ 2019-06-09 |    10 |  25
+ 2019-06-10 |    10 |  35
+ 2019-06-11 |     5 |  40
+ 2019-06-12 |    10 |  50
+ 2019-06-13 |    14 |  64
+ 2019-06-14 |     9 |  73
+ 2019-06-15 |    11 |  84
+ 2019-06-16 |    12 |  96
+ 2019-06-17 |    10 | 106
+ 2019-06-18 |     6 | 112
+ 2019-06-19 |     2 | 114
+ 2019-06-20 |     5 | 119
+ 2019-06-21 |     6 | 125
+ 2019-06-22 |     9 | 134
+ 2019-06-23 |     2 | 136
+ 2019-06-24 |     4 | 140
+ 2019-06-25 |     7 | 147
+ 2019-06-26 |     5 | 152
+ 2019-06-27 |     5 | 157
+ 2019-06-28 |     3 | 160
+(22 rows)
+```
+
+As you can see from the preceding numbers, sales of the **Bat Limited Edition** scooter did not reach double digits during the first 22 days, nor did the daily volume of sales fluctuate as much. In keeping with the overall sales figure, the Limited Edition scooters sold 64 fewer units over the first 22 days.
+
+16. Compute the seven-day **lag** function for the **sum** column and insert the results into the **bat_ltd_sales_delay** table:
+```
+SELECT
+*,
+lag(sum , 7) OVER (ORDER BY sales_transaction_date)
+INTO
+bat_ltd_sales_delay
+FROM
+bat_ltd_sales_growth;
+```
+17. Compute the sales growth for **bat_ltd_sales_delay** in a similar manner that you did in Activity, Quantifying the Sales Drop. Label the column for the results of this calculation **volume** and store the resulting table in **bat_ltd_sales_vol**:
+```
+SELECT
+*,
+(sum-lag)/lag AS volume
+INTO
+bat_ltd_sales_vol
+FROM
+bat_ltd_sales_delay;
+```
+18. Look at the first 22 records of sales in **bat_ltd_sales_vol**:
+```
+SELECT
+*
+FROM
+bat_ltd_sales_vol
+ORDER BY
+Sales_transaction_date
+LIMIT
+22;
+```
+The sales volume can be seen as follows:
+```
+ sales_transaction_date | count | sum | lag |         volume         
+------------------------+-------+-----+-----+------------------------
+ 2019-10-13             |     6 |   6 |     |                       
+ 2019-10-14             |     2 |   8 |     |                       
+ 2019-10-15             |     1 |   9 |     |                       
+ 2019-10-16             |     4 |  13 |     |                       
+ 2019-10-17             |     5 |  18 |     |                       
+ 2019-10-18             |     6 |  24 |     |                       
+ 2019-10-19             |     5 |  29 |     |                       
+ 2019-10-20             |     4 |  33 |   6 |     4.5000000000000000
+ 2019-10-21             |     6 |  39 |   8 |     3.8750000000000000
+ 2019-10-22             |     2 |  41 |   9 |     3.5555555555555556
+ 2019-10-23             |     2 |  43 |  13 |     2.3076923076923077
+ 2019-10-24             |     2 |  45 |  18 |     1.5000000000000000
+ 2019-10-25             |     4 |  49 |  24 |     1.0416666666666667
+ 2019-10-26             |     4 |  53 |  29 | 0.82758620689655172414
+ 2019-10-27             |     5 |  58 |  33 | 0.75757575757575757576
+ 2019-10-28             |     1 |  59 |  39 | 0.51282051282051282051
+ 2019-10-29             |     3 |  62 |  41 | 0.51219512195121951220
+ 2019-10-30             |     8 |  70 |  43 | 0.62790697674418604651
+ 2019-10-31             |     4 |  74 |  45 | 0.64444444444444444444
+ 2019-11-01             |     7 |  81 |  49 | 0.65306122448979591837
+ 2019-11-02             |     7 |  88 |  53 | 0.66037735849056603774
+ 2019-11-03             |     8 |  96 |  58 | 0.65517241379310344828
+(22 rows)
+```
+
+
+
 
 
 
