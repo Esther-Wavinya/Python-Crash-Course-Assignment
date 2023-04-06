@@ -5817,8 +5817,559 @@ Max
 In this activity, you created a user-defined function to calculate the largest sale amount from a single function call using the MAX function. Next, you will create a function that takes arguments.
 
 #### Creating Functions with Arguments
+In this exercise, you will create a single function that will allow you to calculate information from multiple tables. Create a function that determines the average value from the sales amount column with respect to the value of the corresponding channel. After creating your previous user-defined function to determine the biggest sale in the database, you have observed a significant increase in the efficiency with which you fulfill your marketing department's requests.
+
+Perform the following steps to complete the exercise:
+1. Connect to the **sqlda** database.
+2. Create a function called **avg_sales** that takes a text argument input, **channel_type**, and returns a numeric output:
+```
+CREATE FUNCTION avg_sales(channel_type TEXT)
+RETURNS numeric AS $channel_avg$
+```
+3. Declare the numeric **channel_avg** variable and begin the function:
+```
+DECLARE channel_avg numeric;
+BEGIN
+```
+4. Determine the average **sales_amount** only when the channel value is equal to **channel_type**:
+```
+SELECT
+AVG(sales_amount)
+INTO
+channel_avg
+FROM
+sales
+WHERE
+channel=channel_type;
+```
+
+5. Return **channel_avg**:
+```
+RETURN channel_avg;
+```
+6. End the function and specify the **LANGUAGE** statement:
+```
+END; $channel_avg$
+LANGUAGE PLPGSQL;
+```
+7. Determine the average sales amount for the internet channel:
+```
+SELECT avg_sales('internet');
+```
+
+Here is the output of the preceding code:
+```
+avg_sales
+----------------
+7939.33132075954
+(1 row)
+```
+This output shows the average value for sales for a dealership, which is **7939.331**.
+
+In this exercise, you were introduced to using function arguments to further modify the behavior of functions and the outputs they return. Next, you will learn about the **\df** and **\sf** commands.
 
 
+### The \df and \sf commands
+You can use the **\df** command in PostgreSQL to get a list of the functions available in memory, including the variables and data types passed as arguments. The following are the first few rows of this command:
+```
+List of functions
+Schema | Name | Result data type | Argument data types | Type
+--------+--------------------+------------------+-------------------
+-----------------------+------
+public | cube | cube | cube, double precision | func
+public | cube | cube | cube, double precision, double precision |
+func
+public | cube | cube | double precision | func
+public | cube | cube | double precision, double precision | func
+```
+The **\sf function_name** command in PostgreSQL can be used to review the function definition for already-defined functions. For example, in the preceding section, you created a function called **max_sale**. In this case, say you execute the following query:
+```
+\sf max_sale
+```
+The output will show the definition of that function, as follows:
+```
+CREATE OR REPLACE FUNCTION public.max_sale()
+RETURNS integer
+LANGUAGE plpgsql
+AS $function$
+DECLARE big_sale numeric;
+BEGIN
+SELECT MAX(sales_amount) INTO big_sale FROM sales;
+RETURN big_sale;
+END; $function$
+```
+Now that you have walked through several exercises to create functions with and without arguments, you can apply your knowledge to real-world problems. In the following activity, you will practice creating functions that take arguments.
+
+
+#### Creating Functions with Arguments
+In this activity, your goal is to create a function with arguments and compute the output. You will construct a function that computes the average sales amount for transaction sales within a specific date
+range. Each date is to be provided to the function as a text string. These are the steps to follow:
+1. Create the function definition for a function called **avg_sales_window** that returns a numeric value and takes two **DATE** values to specify the from and to dates in the form **YYYY-MM-DD**.
+```
+CREATE FUNCTION avg_sales_window(from_date DATE, to_date DATE)
+RETURNS numeric AS $sales_avg$
+```
+2. Declare the return variable as a numeric data type and begin the function.
+```
+DECLARE sales_avg numeric;
+BEGIN
+```
+3. Select the average sales amount as the return variable where the sales transaction date is within the specified date.
+```
+SELECT AVG(sales_amount)
+FROM sales
+INTO sales_avg
+WHERE sales_transaction_date > from_date
+AND sales_transaction_date < to_date;
+```
+4. Return the function variable, end the function, and specify the **LANGUAGE** statement.
+```
+RETURN sales_avg;
+END; $sales_avg$
+LANGUAGE PLPGSQL;
+```
+5. Use the function to determine the average sales value for transactions between 2020-04-12 and 2021-04-12.
+```
+SELECT avg_sales_window('2020-04-12', '2021-04-12');
+```
+The output is as follows:
+```
+avg_sales_window
+----------------
+7663.13305937025
+(1 row)
+```
+In this activity, you constructed a function that computes the average sales amount for transaction sales within a specific date range from the database.
+
+### Triggers
+Triggers, known as events or callbacks in other programming languages, are useful features that, as the name suggests, trigger the execution of SQL statements or functions in response to a specific event.
+Triggers can be initiated when one of the following happens:
+- A row is inserted into a table.
+- A field within a row is updated.
+- A row within a table is deleted.
+- A table is truncated; that is, all rows are quickly removed from a table.
+
+The timing of the trigger can also be specified to occur:
+- Before an insert, update, delete, or truncate operation
+- After an insert, update, delete, or truncate operation
+- Instead of an insert, update, delete, or truncate operation
+
+Depending upon the context and the purpose of the database, triggers can have a wide variety of different use cases and applications. For example, in a production environment where a database is being used to store business information and make process decisions (such as for a ride-sharing application or an e-commerce store), triggers can be used before any operation to create access logs to the database. These logs can then be used to determine who has accessed or modified the data within the database. Alternatively, triggers could be used to remap database operations to a different database or table using the **INSTEAD OF** trigger.
+
+In the context of a data analysis application, triggers can be used to either create datasets of specific features in real-time (such as for determining the average of data over time or a sample-to-sample difference), test hypotheses concerning the data, or flag outliers being inserted or modified in a dataset.
+
+Given that triggers are used frequently to execute SQL statements in response to events or actions, you can also see why functions are often written specifically for or paired with triggers. Self-contained,
+repeatable function blocks can be used for both trialing/debugging the logic within the function as well as inserting the actual code within the trigger. So, how do you create a trigger? Similar to the case
+of function definitions, there is a standard syntax; again, they are SQL keywords:
+```
+CREATE TRIGGER some_trigger_name
+{ BEFORE | AFTER | INSTEAD OF }
+{ INSERT | DELETE | UPDATE | TRUNCATE }
+ON table_name
+FOR EACH { ROW | STATEMENT }
+EXECUTE PROCEDURE function_name ( function_arguments)
+```
+Looking at this generic trigger definition, you can see that there are a few individual components:
+- You need to provide a name for the trigger in place of **some_trigger_name**.
+- You need to select when the trigger is going to occur, either **BEFORE**, **AFTER**, or **INSTEAD OF** an event.
+- You need to select what type of event you want to trigger on, either **INSERT**, **DELETE**, **UPDATE**, or **TRUNCATE**.
+- You need to provide the table you want to monitor for events in **table_name**.
+- The **FOR EACH** statement is used to specify how the trigger is to be fired. You can fire the trigger for each row that is within the scope of the trigger, or just once per statement despite the number of rows being inserted into the table.
+- Finally, you just need to provide **function_name** and any relevant/required **function_arguments** to provide the functionality that you want to use on each trigger.
+
+Look at the following example, in which you want to add a check that prevents the system from accidentally creating a sale for an amount less than half of the base MSRP. Before you can create a trigger, you need to define a trigger function:
+```
+CREATE OR REPLACE FUNCTION check_sale_amt_vs_msrp()
+RETURNS TRIGGER AS $$
+DECLARE min_allowed_price numeric;
+BEGIN
+SELECT
+base_msrp * 0.5
+INTO
+min_allowed_price
+FROM
+products
+WHERE
+product_id = NEW.product_id;
+IF NEW.sales_amount < min_allowed_price THEN
+RAISE EXCEPTION 'Sales amount cannot be less than half of MSRP';
+END IF;
+RETURN NEW;
+END;
+$$ LANGUAGE PLPGSQL;
+```
+Next, you need to create the trigger that will run if a record is added or updated:
+```
+CREATE TRIGGER sales_product_sales_amount_msrp
+AFTER INSERT OR UPDATE
+ON sales
+FOR EACH ROW
+EXECUTE PROCEDURE check_sale_amt_vs_msrp();
+```
+You can test that this works by testing an insertion into the sales table that does not meet the minimum sales amount criteria:
+```
+INSERT INTO sales (
+SELECT
+customer_id,
+product_id,
+sales_transaction_date,
+sales_amount/3.0,
+channel,
+dealership_id
+FROM
+sales
+LIMIT
+1
+);
+```
+This gives the following output:
+```
+ERROR: Sales amount cannot be less than half of MSRP
+CONTEXT: PL/pgSQL function check_sale_amt_vs_msrp() line 6 at RAISE
+```
+
+#### Creating Triggers to Update Fields
+In this exercise, you will introduce two new tables into the **sqlda** database, one called **new_products** and another called **order_info**. The **new_products** table contains some product information together with their inventory, and the **order_info** table contains the orders
+placed on different products.
+
+For this exercise, you will create a trigger that updates the inventory (also called stock) value within the **new_products** table for a product each time that an order is inserted into a new **order_info**
+table. As orders are placed and items are bought, the triggers will be fired, and the quantity of available stock will be updated. Using such a trigger, you can update your analysis in real-time as end users interact with the database. These triggers will remove the need for you to run the analysis for the marketing department manually; instead, they will generate the results for you.
+
+Here are the steps to perform:
+1. Create the required tables in the **sqlda** database using the following queries:
+```
+CREATE TABLE order_info (
+order_id integer,
+customer_id integer,
+product_code text,
+qty integer
+);
+INSERT INTO order_info VALUES (1618, 3, 'GROG1', 12);
+INSERT INTO order_info VALUES (1619, 2, 'POULET3', 3);
+INSERT INTO order_info VALUES (1620, 4, 'MON123', 1);
+INSERT INTO order_info VALUES (1621, 4, 'MON636', 3);
+INSERT INTO order_info VALUES (1622, 5, 'MON666', 1);
+CREATE TABLE new_products (
+product_code text,
+name text,
+stock integer
+);
+INSERT INTO new_products VALUES
+('MON636', 'Red Herring', 99);
+INSERT INTO new_products VALUES
+('MON666', 'Murray"s Arm', 0);
+INSERT INTO new_products VALUES
+('GROG1', 'Grog', 65);
+INSERT INTO new_products VALUES
+('POULET3', 'El Pollo Diablo', 2);
+INSERT INTO new_products VALUES
+('MON123', 'Rubber Chicken + Pulley', 7);
+```
+2. Create the required functions in the **sqlda** database.
+
+You will need to open up a query tool such as pgAdmin and connect to the **sqlda** database. Copy and paste the content of the **Functions.sql** file into the query tool and run the statements. There are three functions in this **Functions.sq**l file that you will use, which are as follows:
+
+- The **get_stock** function takes a product code as a **TEXT** input and returns the currently available stock for the specific product code.
+- The **insert_order** function is used to add a new order to the **order_info** table and takes **customer_id INTEGER, product_code TEXT**, and **qty INTEGER** as inputs; it will return the **order_id** instance generated for the new record.
+- The **update_stock** function will extract the information from the most recent order and update the corresponding stock information from the **products** table for the corresponding **product_code**.
+```
+CREATE OR REPLACE FUNCTION get_stock(TEXT) 
+RETURNS integer AS $stock_val$
+DECLARE stock_val integer;
+BEGIN
+    SELECT stock INTO stock_val 
+    FROM new_products 
+    WHERE product_code=$1;
+RETURN stock_val;
+END; $stock_val$
+LANGUAGE PLPGSQL;
+
+CREATE OR REPLACE FUNCTION update_stock() 
+RETURNS integer AS $stock_qty$
+DECLARE
+    stock_qty integer;
+    _order_id integer;
+    _prod_code TEXT;
+BEGIN
+    SELECT max(order_id) 
+    INTO _order_id 
+    FROM order_info; 
+    
+    SELECT qty 
+    INTO stock_qty 
+    FROM order_info 
+    WHERE order_id= _order_id;
+    
+    SELECT product_code 
+    INTO _prod_code 
+    FROM order_info 
+    WHERE order_id=_order_id;
+
+    stock_qty := get_stock(_prod_code) - stock_qty;
+    
+    UPDATE new_products 
+    SET stock = stock_qty 
+    WHERE product_code=_prod_code; 
+RETURN stock_qty;
+END; $stock_qty$
+LANGUAGE PLPGSQL;
+
+CREATE OR REPLACE FUNCTION insert_order(integer, TEXT, integer) 
+RETURNS integer AS $new_order_id$
+DECLARE
+   new_order_id integer;
+BEGIN
+    SELECT MAX(order_id) 
+    INTO new_order_id 
+    FROM order_info;
+    
+    new_order_id := new_order_id + 1;
+    
+    INSERT INTO order_info (order_id, customer_id, product_code, qty) VALUES
+        (new_order_id, $1, $2, $3);
+RETURN new_order_id;
+END; $new_order_id$
+LANGUAGE PLPGSQL;
+```
+3. Get a list of the functions using the **\df** command after loading the function definitions. This will display the following output:
+```
+List of functions
+Schema | Name | Result data type | Argument data types | Type
+--------+-----------+------------------+---------------------+--
+----
+public | get_stock | integer | text | func
+(1 row)
+```
+4. First, look at the current state of the **new_products** table:
+```
+SELECT * FROM new_products;
+```
+Here is the output of the preceding code:
+```
+ product_code |          name           | stock 
+--------------+-------------------------+-------
+ MON636       | Red Herring             |    99
+ MON666       | Murray"s Arm            |     0
+ GROG1        | Grog                    |    65
+ POULET3      | El Pollo Diablo         |     2
+ MON123       | Rubber Chicken + Pulley |     7
+(5 rows)
+```
+For the **order_info** table, you can write the following query:
+```
+SELECT * FROM order_info;
+```
+Here is the output of the preceding code:
+```
+ order_id | customer_id | product_code | qty 
+----------+-------------+--------------+-----
+     1618 |           3 | GROG1        |  12
+     1619 |           2 | POULET3      |   3
+     1620 |           4 | MON123       |   1
+     1621 |           4 | MON636       |   3
+     1622 |           5 | MON666       |   1
+(5 rows)
+```
+5. Insert a new order using the **insert_order** function with **customer_id 4**, **product_code MON636**, and **qty 10**:
+```
+SELECT insert_order(4, 'MON636', 10);
+```
+Here is the output of the preceding code:
+```
+ insert_order 
+--------------
+         1623
+(1 row)
+```
+6. Review the entries for the **order_info** table:
+```
+SELECT * FROM order_info;
+```
+This will display the following output:
+```
+ order_id | customer_id | product_code | qty 
+----------+-------------+--------------+-----
+     1618 |           3 | GROG1        |  12
+     1619 |           2 | POULET3      |   3
+     1620 |           4 | MON123       |   1
+     1621 |           4 | MON636       |   3
+     1622 |           5 | MON666       |   1
+     1623 |           4 | MON636       |  10
+(6 rows)
+
+```
+Notice the additional row with **order_id 1623**.
+
+7. Update the **new_products** table to account for the newly sold 10 red herrings using the **update_stock** function:
+```
+SELECT update_stock();
+```
+Here is the output of the preceding code:
+```
+ update_stock 
+--------------
+           89
+(1 row)
+```
+This function call will determine how many red herrings are left in the inventory (after the sale of the 10 additional herrings) and will update the table accordingly.
+
+8. Review the **new_products** table and notice the updated stock value for **Red Herring**:
+```
+SELECT * FROM new_products;
+```
+Here is the output of the preceding code:
+```
+ product_code |          name           | stock 
+--------------+-------------------------+-------
+ MON666       | Murray"s Arm            |     0
+ GROG1        | Grog                    |    65
+ POULET3      | El Pollo Diablo         |     2
+ MON123       | Rubber Chicken + Pulley |     7
+ MON636       | Red Herring             |    89
+(5 rows)
+```
+Updating the stock values manually will quickly become tedious. Create a trigger to do this automatically whenever a new order is placed.
+
+9. Delete (**DROP**) the previous **update_stock** function. Before you can create a trigger, you must first adjust the **update_stock** function to return a trigger, which has the benefit of allowing for some simplified code:
+```
+DROP FUNCTION update_stock;
+```
+10. Create a new **update_stock** function that returns a trigger. Note that the function definition is also contained within the **Functions.sql** file for reference or direct loading into the database:
+```
+CREATE FUNCTION update_stock()
+RETURNS TRIGGER AS $stock_trigger$
+DECLARE stock_qty integer;
+BEGIN
+stock_qty := get_stock(NEW.product_code) - NEW.qty;
+UPDATE
+new_products
+SET
+stock=stock_qty
+WHERE
+product_code=NEW.product_code;
+RETURN NEW;
+END; $stock_trigger$
+LANGUAGE PLPGSQL;
+```
+Note that in this function definition, you are using the **NEW** keyword followed by the dot operator (**.**) and the **product_code (NEW.product_code**) and **qty (NEW.qty)** field names from the **order_info** table. The **NEW** keyword refers to the record that was recently inserted, updated, or deleted and provides a reference to the information within the record.
+
+In this exercise, you want the trigger to fire after the record is inserted into **order_info** and thus the **NEW** reference will contain this information. So, you can use the **get_stock** function with **NEW.product_code** to get the currently available stock for the record and simply subtract the **NEW.qty** value from the order record.
+
+11. Finally, create the trigger. You want the trigger to occur after an **INSERT** operation on the **order_info** table. For each row, you want to execute the newly modified **update_stock** function to update the stock values in the product table:
+```
+CREATE TRIGGER update_trigger
+AFTER INSERT ON order_info
+FOR EACH ROW
+EXECUTE PROCEDURE update_stock();
+```
+12. Now that you have created a new trigger, test it. Call the **insert_order** function to insert a new record into the **order_info** table:
+```
+SELECT insert_order(4, 'MON123', 2);
+```
+Here is the output of the preceding code:
+```
+ insert_order 
+--------------
+         1624
+(1 row)
+```
+13. Look at the records from the **order_info** table:
+```
+SELECT * FROM order_info;
+```
+Here is the output of the preceding code:
+```
+ order_id | customer_id | product_code | qty 
+----------+-------------+--------------+-----
+     1618 |           3 | GROG1        |  12
+     1619 |           2 | POULET3      |   3
+     1620 |           4 | MON123       |   1
+     1621 |           4 | MON636       |   3
+     1622 |           5 | MON666       |   1
+     1623 |           4 | MON636       |  10
+     1624 |           4 | MON123       |   2
+(7 rows)
+```
+14. Look at the records for the **new_products** table:
+```
+SELECT * FROM new_products;
+```
+Here is the output of the preceding code:
+```
+ product_code |          name           | stock 
+--------------+-------------------------+-------
+ MON666       | Murray"s Arm            |     0
+ GROG1        | Grog                    |    65
+ POULET3      | El Pollo Diablo         |     2
+ MON636       | Red Herring             |    89
+ MON123       | Rubber Chicken + Pulley |     5
+(5 rows)
+
+```
+Our trigger worked. You can see that the available stock for **Rubber Chicken + Pulley MON123** has been reduced from **7** to **5**, in accordance with the quantity of the inserted order.
+
+#### Creating a Trigger to Track Average Purchases
+Our goal here is to create a trigger for keeping track of the data that is updated. Say you are working as a data scientist for ZoomZoom. The business is looking at trying a few different strategies to increase the number of items in each sale. To simplify your analysis, you decide to add a simple trigger that, for each new order, computes the average quantity in all the orders and puts the result in a new table along with the corresponding **order_id**. Here are the steps to follow:
+
+1. Connect to the **sqlda** database.
+
+2. Create a new table called **avg_qty_log** that is composed of an **order_id integer** field and an **avg_qty numeric** field.
+```
+CREATE TABLE avg_qty_log (order_id integer, avg_qty numeric);
+```
+3. Create a function called **avg_qty** that does not take any arguments but returns a trigger. The function computes the average value for all order quantities (**order_info.qty**) and inserts the average value, along with the most recent **order_id**, into **avg_qty**.
+```
+CREATE FUNCTION avg_qty() RETURNS TRIGGER AS $_avg$
+DECLARE _avg numeric;
+BEGIN
+SELECT
+AVG(qty)
+INTO
+_avg
+FROM
+order_info;
+INSERT INTO
+avg_qty_log (order_id, avg_qty)
+VALUES
+(NEW.order_id, _avg);
+RETURN NEW;
+END; $_avg$
+LANGUAGE PLPGSQL;
+```
+4. Create a trigger called **avg_trigger** that calls the **avg_qty** function after each row is inserted into the **order_info** table.
+```
+CREATE TRIGGER avg_trigger
+AFTER INSERT ON order_info
+FOR EACH ROW
+EXECUTE PROCEDURE avg_qty();
+```
+5. Insert some new rows into the **order_info** table with quantities of **6**, **7**, and **8**.
+```
+SELECT insert_order(3, 'GROG1', 6);
+SELECT insert_order(4, 'GROG1', 7);
+SELECT insert_order(1, 'GROG1', 8);
+```
+6. Look at the entries in **avg_qty_log**. Is the average quantity of each order increasing? 
+```
+SELECT * FROM avg_qty_log;
+```
+The result is as follows:
+```
+ order_id |      avg_qty       
+----------+--------------------
+     1625 | 4.7500000000000000
+     1626 | 5.0000000000000000
+     1627 | 5.3000000000000000
+(3 rows)
+```
+You can see that the average quantity is gradually increasing.
+
+
+
+
+# Using SQL to Uncover the Truth: A Case Study
+
+   
 
 
 
