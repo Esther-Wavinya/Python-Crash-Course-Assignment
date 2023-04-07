@@ -7220,26 +7220,732 @@ The sales volume can be seen as follows:
  2019-11-03             |     8 |  96 |  58 | 0.65517241379310344828
 (22 rows)
 ```
+Looking at the **volume** column, you can see that the sales growth is more consistent than for the original **Bat** Scooter. The growth within the first week is less than that of the original model, but it is
+sustained over a longer period. After 22 days of sales, the sales growth of the Limited Edition scooter is 65% compared to the previous week, as compared with the 28% growth you identified in Activity, Quantifying the Sales Drop.
 
+At this stage, you have collected data from two similar products that were launched at different periods and found some differences in the trajectory of the sales growth over the first 3 weeks of sales. In a professional setting, you may also consider employing more sophisticated statistical
+comparison methods, such as tests for differences in mean, variance, or survival analysis. These methods lie outside the scope of this text; therefore, you will only use simple comparison in this section.
 
+While you can see that there is a difference in sales between the two **Bat** Scooters, you cannot rule out the fact that the sales differences can be attributed to the difference in the sales price of the two
+scooters. The Limited Edition scooter is $100 more expensive. In the next activity, you will compare the sales of the **Bat** Scooter to the 2016 **Lemon**, which is $100 cheaper, was launched 3 years prior, is no longer in production, and started production in the first half of the calendar year.
 
+### Analyzing the Difference in the Sales Price Hypothesis
+In this activity, you are going to investigate the hypothesis that the reduction in sales growth can be attributed to the price point of the **Bat** Scooter. Previously in this text, you considered the impact
+of the launch date. However, there could be another factor—the sales price included. If you consider the product list of scooters in Exercise, Preliminary Data Collection Using SQL Techniques, and exclude the **Bat** Scooter, you can see that there are two price categories: $699.99 and above or $499.99 and below. The **Bat** Scooter sits exactly between these two groups; perhaps the reduction in sales growth can be attributed to the different pricing models. 
 
+In this activity, you will test this hypothesis by comparing Bat sales to the 2016 **Lemon**, whose production started on **2015-12-27**:
+```
+         model         | base_msrp | production_start_date 
+-----------------------+-----------+-----------------------
+ Lemon Zester          |    349.99 | 2021-10-01 00:00:00
+ Lemon                 |    399.99 | 2012-10-28 00:00:00
+ Lemon                 |    499.99 | 2015-12-27 00:00:00
+ Bat                   |    599.99 | 2019-06-07 00:00:00
+ Blade                 |    699.99 | 2017-02-17 00:00:00
+ Bat Limited Edition   |    699.99 | 2019-10-13 00:00:00
+ Lemon Limited Edition |    799.99 | 2013-08-30 00:00:00
+(7 rows)
+```
+Perform the following steps to complete this activity:
 
+1. Load the **sqlda** database from psql.
+2. Select the **sales_transaction_date** column for 2016 **Lemon** model sales and insert the column into a table called **lemon_sales**.
+```
+SELECT
+sales_transaction_date
+INTO
+lemon_sales
+FROM
+sales
+WHERE
+product_id=3;
+```
+3. Count the sales records available for the 2016 **Lemon** model.
+```
+SELECT
+count(sales_transaction_date)
+FROM
+lemon_sales;
+```
+The result is as follows:
+```
+ count 
+-------
+ 16558
+(1 row)
+```
 
+4. Display the latest **sales_transaction_date** column.
+```
+SELECT
+max(sales_transaction_date)
+FROM
+lemon_sales;
+```
+The result is as follows:
+```
+         max         
+---------------------
+ 2021-08-23 19:12:10
+(1 row)
+```
 
+5. Convert the **sales_transaction_date** column into a **date** type.
+```
+ALTER TABLE
+lemon_sales
+ALTER COLUMN
+sales_transaction_date TYPE DATE;
+```
+6. Count the number of sales per day within the **lemon_sales** table and insert the data into a table called **lemon_sales_count**.
+```
+SELECT
+sales_transaction_date,
+COUNT(sales_transaction_date)
+INTO
+lemon_sales_count
+FROM
+lemon_sales
+GROUP BY
+sales_transaction_date
+ORDER BY
+sales_transaction_date;
+```
+7. Calculate the cumulative sum of sales and insert the corresponding table into a new table labeled **lemon_sales_sum**. 
+```
+SELECT
+*,
+sum(count) OVER (ORDER BY sales_transaction_date)
+INTO
+lemon_sales_sum
+FROM
+lemon_sales_count;
+```
+8. Compute the seven-day **lag** function on the **sum** column and save the result to **lemon_sales_delay**.
+```
+SELECT
+*,
+lag(sum, 7) OVER (ORDER BY sales_transaction_date)
+INTO
+lemon_sales_delay
+FROM
+lemon_sales_sum;
+```
+9.  Calculate the growth rate using the data from **lemon_sales_delay** and store the resulting table in **lemon_sales_growth**.
+```
+SELECT
+*,
+(sum-lag)/lag AS volume
+INTO
+lemon_sales_growth
+FROM
+lemon_sales_delay;
+```
+10. Inspect the first 22 records of the **lemon_sales_growth** table by examining the **volume** data.
+```
+SELECT
+*
+FROM
+lemon_sales_growth
+ORDER BY
+Sales_transaction_date
+LIMIT
+22;
+```
+The expected output is as follows:
+```
+ sales_transaction_date | count | sum | lag |         volume         
+------------------------+-------+-----+-----+------------------------
+ 2015-12-27             |     6 |   6 |     |                       
+ 2015-12-28             |     8 |  14 |     |                       
+ 2015-12-29             |     4 |  18 |     |                       
+ 2015-12-30             |     9 |  27 |     |                       
+ 2015-12-31             |     9 |  36 |     |                       
+ 2016-01-01             |     6 |  42 |     |                       
+ 2016-01-02             |     8 |  50 |     |                       
+ 2016-01-03             |     6 |  56 |   6 |     8.3333333333333333
+ 2016-01-04             |     6 |  62 |  14 |     3.4285714285714286
+ 2016-01-05             |     9 |  71 |  18 |     2.9444444444444444
+ 2016-01-06             |     3 |  74 |  27 |     1.7407407407407407
+ 2016-01-07             |     4 |  78 |  36 |     1.1666666666666667
+ 2016-01-08             |     7 |  85 |  42 |     1.0238095238095238
+ 2016-01-09             |     3 |  88 |  50 | 0.76000000000000000000
+ 2016-01-10             |     3 |  91 |  56 | 0.62500000000000000000
+ 2016-01-11             |     4 |  95 |  62 | 0.53225806451612903226
+ 2016-01-12             |     6 | 101 |  71 | 0.42253521126760563380
+ 2016-01-13             |     9 | 110 |  74 | 0.48648648648648648649
+ 2016-01-14             |     6 | 116 |  78 | 0.48717948717948717949
+ 2016-01-15             |     6 | 122 |  85 | 0.43529411764705882353
+ 2016-01-16             |    11 | 133 |  88 | 0.51136363636363636364
+ 2016-01-17             |     8 | 141 |  91 | 0.54945054945054945055
+(22 rows)
+```
+Now that you have collected data to test the two hypotheses of timing and cost, what observations can you make and what conclusions can you draw?
 
+The first observation that you can make is regarding the total volume of sales for the three different scooter products. The **Lemon** Scooter, over its production life cycle of 4.5 years, sold **16558** units,
+while the two **Bat** Scooters, the original and Limited Edition models, sold **7328** and **5803** units, respectively, and are still currently in production, with the **Bat** Scooter launching about 4 months earlier and with approximately 2.5 years of sales data available.
 
+Looking at the sales growth of the three different scooters, you can also make a few different observations:
 
+- The original **Bat** Scooter, which launched on **2019-06-07** at a price of $**599.99**, experienced a 700% sales growth in its second week of production and finished the first 22 days with 28% growth and a sales figure of 160 units.
+- The **Bat Limited Edition** Scooter, which launched in **2019-10-13** at a price of $**699.99**, experienced 450% growth at the start of its second week of production and finished with 96 sales and 66% growth over the first 22 days.
+- The 2016 **Lemon** Scooter, which launched in **2015-12-27** at a price of $**499.99**, experienced 830% growth in the second week of production and ended its first 22 days with 141 sales and 55% growth.
+  
+Based on this information, you can make different conclusions:
 
+- The initial growth rate starting in the second week of sales correlates to the cost of the scooter. As the cost increased to $**699.99**, the initial growth rate dropped from 830% to 450%.
+- The number of units sold in the first 22 days does not directly correlate to the cost. The $**599.99** Bat Scooter sold more than the 2016 **Lemon** Scooter in that first period, despite the price difference.
+- There is some evidence to suggest that the reduction in sales can be attributed to seasonal variations, given the significant reduction in growth and the fact that the original Bat Scooter was the only one released in June. So far, the evidence suggests that the drop in sales can be attributed to the difference in launch timing.
+  
+Before you draw the conclusion that the difference can be attributed to seasonal variations and launch timing, ensure that you have extensively tested a range of possibilities. Perhaps marketing work, such as email campaigns (that is, when the emails were sent) and the frequency with which the emails were opened, made a difference.
 
+Now that you have considered both the launch timing and the suggested retail price of the scooter as possible causes of the reduction in sales, it is time to direct your efforts to other potential causes, such
+as the rate of opening marketing emails. Does the marketing email opening rate influence sales growth throughout the first 3 weeks? You will find out in the next exercise.
 
+### Analyzing Sales Growth by Email Opening Rate
+In this exercise, you will analyze the sales growth using the email opening rate. To investigate the hypothesis that a decrease in the rate of opening emails impacted the **Bat** Scooter sales rate, you will again select the **Bat** and **Lemon** Scooters and compare the email opening rates.
+Perform the following steps to complete this exercise:
+1. Load the **sqlda** database from psql.
+2. Firstly, look at the **emails** table to see what information is available. Select the first five rows of the **emails** table:
+```
+SELECT
+*
+FROM
+emails
+LIMIT
+5;
+```
+The following result displays the email information for the first five rows:
+```
+ email_id | customer_id |      email_subject       | opened | clicked | bounced |      sent_date      | opened_date | clicked_date 
+----------+-------------+--------------------------+--------+---------+---------+---------------------+-------------+--------------
+   175138 |         575 | Like a Bat out of Heaven | f      | f       | f       | 2019-05-19 15:00:00 |             | 
+   175484 |        1074 | Like a Bat out of Heaven | f      | f       | f       | 2019-05-19 15:00:00 |             | 
+   177740 |        4229 | Like a Bat out of Heaven | f      | f       | f       | 2019-05-19 15:00:00 |             | 
+   177826 |        4359 | Like a Bat out of Heaven | f      | f       | f       | 2019-05-19 15:00:00 |             | 
+   180518 |        8197 | Like a Bat out of Heaven | f      | f       | f       | 2019-05-19 15:00:00 |             | 
+(5 rows)
+```
 
+To investigate your hypothesis, you need to know whether an email was opened, when it was opened, as well as who the customer who opened the email was, and whether that customer purchased a scooter. If the email marketing campaign was successful in maintaining the sales growth rate, you
+would expect a customer to open an email soon before a scooter was purchased. The period in which the emails were sent, as well as the IDs of customers who received and opened an email, can help you determine whether a customer who made a sale may have been encouraged to do so following
+the receipt of an email.
 
+3. To determine this hypothesis, you need to collect the **customer_id** column from both the **emails** table and the **bat_sales** table for the **Bat** Scooter, the **opened**, **sent_date**, **opened_date**, and **email_subject** columns from the **emails** table, as well as the
+**sales_date** column from the **bat_sales** table. Since you only want the email records of customers who purchased a **Bat** Scooter, you will join the **customer_id** column in both tables. Then, you will insert the results into a new table—**bat_emails**:
+```
+SELECT
+emails.email_subject,
+emails.customer_id,
+emails.opened,
+emails.sent_date,
+emails.opened_date,
+bat_sales.sales_date
+INTO
+bat_emails
+FROM
+emails
+INNER JOIN
+bat_sales
+ON
+bat_sales.customer_id=emails.customer_id
+ORDER BY
+bat_sales.sales_date;
+```
+You will obtain the following output:
+```
+SELECT 40190
+```
+4. Select the first 10 rows of the **bat_emails** table, ordering the results by **sales_date**:
+```
+SELECT
+*
+FROM
+bat_emails
+ORDER BY
+sales_date
+LIMIT
+10;
+```
+The following table shows the first 10 rows of the **bat_emails** table ordered by **sales_ date**:
+```
+               email_subject                | customer_id | opened |      sent_date      |     opened_date     | sales_date 
+--------------------------------------------+-------------+--------+---------------------+---------------------+------------
+ Save the Planet with some Holiday Savings. |       35497 | t      | 2021-07-20 15:00:00 | 2021-07-21 09:44:50 | 2019-06-07
+ A New Year, And Some New EVs               |       24125 | f      | 2021-09-03 15:00:00 |                     | 2019-06-07
+ A New Year, And Some New EVs               |        4319 | f      | 2021-09-03 15:00:00 |                     | 2019-06-07
+ We Really Outdid Ourselves this Year       |        4553 | f      | 2019-09-12 15:00:00 |                     | 2019-06-07
+ 25% off all EVs. It's a Christmas Miracle! |       42213 | f      | 2019-07-23 15:00:00 |                     | 2019-06-07
+ 25% off all EVs. It's a Christmas Miracle! |        4553 | f      | 2019-07-23 15:00:00 |                     | 2019-06-07
+ Tis' the Season for Savings                |       40250 | f      | 2018-07-23 15:00:00 |                     | 2019-06-07
+ 25% off all EVs. It's a Christmas Miracle! |       11678 | f      | 2019-07-23 15:00:00 |                     | 2019-06-07
+ Like a Bat out of Heaven                   |       40250 | f      | 2019-05-19 15:00:00 |                     | 2019-06-07
+ A New Year, And Some New EVs               |        4553 | f      | 2021-09-03 15:00:00 |                     | 2019-06-07
+(10 rows)
+```
+Here, you can see that there are several emails unopened, over a range of sent dates, and that some customers have received multiple emails. Looking at the subjects of the emails, some of them do not seem related to the ZoomZoom scooters at all.
 
+5. Select all rows where the **sent_date** email predates the **sales_date** column, order them by **customer_id**, and limit the output to the first 22 rows. This will help you find out which emails were sent to each customer before they purchased their scooter. Write the following
+query to do so:
+```
+SELECT
+*
+FROM
+bat_emails
+WHERE
+sent_date < sales_date
+ORDER BY
+customer_id
+LIMIT
+22;
+```
+The following table lists the emails that were sent to customers before the date in the **sales_date** column:
+```
+                 email_subject                 | customer_id | opened |      sent_date      |     opened_date     | sales_date 
+-----------------------------------------------+-------------+--------+---------------------+---------------------+------------
+ An Electric Car for a New Age                 |           7 | t      | 2017-11-26 15:00:00 | 2017-11-27 15:10:55 | 2021-12-20
+ The 2013 Lemon Scooter is Here                |           7 | f      | 2015-10-27 15:00:00 |                     | 2021-12-20
+ A Brand New Scooter...and Car                 |           7 | f      | 2016-12-31 15:00:00 |                     | 2021-12-20
+ Black Friday. Green Cars.                     |           7 | f      | 2020-07-21 15:00:00 |                     | 2021-12-20
+ 25% off all EVs. It's a Christmas Miracle!    |           7 | t      | 2019-07-23 15:00:00 | 2019-07-24 03:55:30 | 2021-12-20
+ We cut you a deal: 20%% off a Blade           |           7 | t      | 2017-05-15 15:00:00 | 2017-05-16 15:11:17 | 2021-12-20
+ Save the Planet with some Holiday Savings.    |           7 | f      | 2021-07-20 15:00:00 |                     | 2021-12-20
+ Zoom Zoom Black Friday Sale                   |           7 | f      | 2017-07-25 15:00:00 |                     | 2021-12-20
+ Shocking Holiday Savings On Electric Scooters |           7 | f      | 2016-07-26 15:00:00 |                     | 2021-12-20
+ Like a Bat out of Heaven                      |           7 | f      | 2019-05-19 15:00:00 |                     | 2021-12-20
+ Tis' the Season for Savings                   |           7 | f      | 2018-07-23 15:00:00 |                     | 2021-12-20
+ A New Year, And Some New EVs                  |           7 | f      | 2021-09-03 15:00:00 |                     | 2021-12-20
+ We Really Outdid Ourselves this Year          |           7 | f      | 2019-09-12 15:00:00 |                     | 2021-12-20
+ A Brand New Scooter...and Car                 |          22 | t      | 2016-12-31 15:00:00 | 2017-01-01 13:31:23 | 2020-04-10
+ Tis' the Season for Savings                   |          22 | f      | 2018-07-23 15:00:00 |                     | 2020-04-10
+ We Really Outdid Ourselves this Year          |          22 | f      | 2019-09-12 15:00:00 |                     | 2020-04-10
+ We cut you a deal: 20%% off a Blade           |          22 | f      | 2017-05-15 15:00:00 |                     | 2020-04-10
+ Zoom Zoom Black Friday Sale                   |          22 | t      | 2017-07-25 15:00:00 | 2017-07-26 11:31:03 | 2020-04-10
+ Shocking Holiday Savings On Electric Scooters |          22 | f      | 2016-07-26 15:00:00 |                     | 2020-04-10
+ 25% off all EVs. It's a Christmas Miracle!    |          22 | f      | 2019-07-23 15:00:00 |                     | 2020-04-10
+ An Electric Car for a New Age                 |          22 | f      | 2017-11-26 15:00:00 |                     | 2020-04-10
+ Like a Bat out of Heaven                      |          22 | f      | 2019-05-19 15:00:00 |                     | 2020-04-10
+(22 rows)
+```
 
+6. Delete the rows of the **bat_emails** table where emails were sent more than six months prior to production. As you can see, there are some emails that were sent years before the transaction date. You can easily remove some of the unwanted emails by removing those sent before the **Bat** Scooter was in production. In the **products** table, the production start date for the **Bat** Scooter is **2019-06-07**:
+```
+DELETE FROM
+bat_emails
+WHERE
+sent_date < '2019-06-07';
+```
+**Note**
+In this exercise, you are removing information that you no longer require from an existing table. This differs from the previous exercises, where you created multiple tables: each with a slightly different information from the others. The technique you apply will differ, depending on the requirements of the problem being solved. Do you require a traceable record of analysis, or are efficiency and reduced storage the key?
 
+7. Delete the rows where the sent date is after the purchase date since they are not relevant to the sales:
+```
+DELETE FROM
+bat_emails
+WHERE
+sent_date > sales_date;
+```
 
+8. Delete those rows where the difference between the transaction date and the sent date exceeds 30 since you only want emails that were sent shortly before the scooter purchase. An email 1 year before is probably unlikely to influence a purchasing decision, but one that is closer to the purchase date may have influenced the sales decision. You will set a limit of 1 month (30 days) before the purchase. Write the following query to do so:
+```
+DELETE FROM
+Bat_emails
+WHERE
+sales_date-sent_date > '30 days';
+```
+9. Examine the first 22 rows again, ordered by **customer_id**, by running the following query:
+```
+SELECT
+*
+FROM
+bat_emails
+ORDER BY
+customer_id
+LIMIT
+22;
+```
+The following table shows the emails where the difference between the transaction date and the sent date is less than 30 days:
+```
+               email_subject                | customer_id | opened |      sent_date      |     opened_date     | sales_date 
+--------------------------------------------+-------------+--------+---------------------+---------------------+------------
+ 25% off all EVs. It's a Christmas Miracle! |         129 | t      | 2019-07-23 15:00:00 | 2019-07-24 06:31:37 | 2019-07-26
+ A New Year, And Some New EVs               |         145 | f      | 2021-09-03 15:00:00 |                     | 2021-09-16
+ Black Friday. Green Cars.                  |         150 | f      | 2020-07-21 15:00:00 |                     | 2020-08-15
+ Black Friday. Green Cars.                  |         173 | f      | 2020-07-21 15:00:00 |                     | 2020-08-01
+ We Really Outdid Ourselves this Year       |         196 | f      | 2019-09-12 15:00:00 |                     | 2019-09-20
+ We Really Outdid Ourselves this Year       |         319 | f      | 2019-09-12 15:00:00 |                     | 2019-09-26
+ 25% off all EVs. It's a Christmas Miracle! |         418 | f      | 2019-07-23 15:00:00 |                     | 2019-08-18
+ A New Year, And Some New EVs               |         560 | t      | 2021-09-03 15:00:00 | 2021-09-04 15:56:14 | 2021-09-25
+ We Really Outdid Ourselves this Year       |         600 | f      | 2019-09-12 15:00:00 |                     | 2019-09-15
+ A New Year, And Some New EVs               |         660 | t      | 2021-09-03 15:00:00 | 2021-09-04 23:37:03 | 2021-09-04
+ A New Year, And Some New EVs               |         681 | f      | 2021-09-03 15:00:00 |                     | 2021-09-09
+ Black Friday. Green Cars.                  |         806 | t      | 2020-07-21 15:00:00 | 2020-07-22 16:59:40 | 2020-07-26
+ A New Year, And Some New EVs               |         881 | t      | 2021-09-03 15:00:00 | 2021-09-04 21:07:28 | 2021-09-18
+ 25% off all EVs. It's a Christmas Miracle! |         934 | t      | 2019-07-23 15:00:00 | 2019-07-24 09:22:45 | 2019-08-21
+ 25% off all EVs. It's a Christmas Miracle! |         983 | f      | 2019-07-23 15:00:00 |                     | 2019-07-27
+ A New Year, And Some New EVs               |        1060 | f      | 2021-09-03 15:00:00 |                     | 2021-09-23
+ 25% off all EVs. It's a Christmas Miracle! |        1288 | f      | 2019-07-23 15:00:00 |                     | 2019-08-08
+ 25% off all EVs. It's a Christmas Miracle! |        1317 | f      | 2019-07-23 15:00:00 |                     | 2019-08-10
+ A New Year, And Some New EVs               |        1400 | t      | 2021-09-03 15:00:00 | 2021-09-04 15:01:00 | 2021-09-06
+ Save the Planet with some Holiday Savings. |        1417 | f      | 2021-07-20 15:00:00 |                     | 2021-07-23
+ Save the Planet with some Holiday Savings. |        1433 | f      | 2021-07-20 15:00:00 |                     | 2021-08-19
+ Black Friday. Green Cars.                  |        1529 | f      | 2020-07-21 15:00:00 |                     | 2020-07-25
+(22 rows)
+```
+At this stage, you have reasonably filtered the available data based on the dates the email was sent and opened. Looking at the preceding **email_subject** column, it also appears that there are a few emails unrelated to the **Bat** Scooter (for example, **25% of all EVs. It's a Christmas Miracle! and Black Friday. Green Cars**). These emails seem more related to electric cars than scooters, so you can remove them from your analysis.
 
+10. Select the distinct value from the **email_subject** column to get a list of the different emails that were sent to customers:
+```
+SELECT
+DISTINCT(email_subject)
+FROM
+bat_emails;
+```
+The following table shows a list of distinct email subjects:
+```
+               email_subject                
+--------------------------------------------
+ A New Year, And Some New EVs
+ Save the Planet with some Holiday Savings.
+ We Really Outdid Ourselves this Year
+ Black Friday. Green Cars.
+ 25% off all EVs. It's a Christmas Miracle!
+(5 rows)
+```
+11. Delete all the records that have **Black Friday** in the email subject. These emails do not appear to be relevant to the sale of the **Bat** Scooter:
+```
+DELETE FROM
+bat_emails
+WHERE
+position('Black Friday' in email_subject)>0;
+```
+**Note**
+The position function in the preceding example is used to find any records where the **Black Friday** string is anywhere in the **email_subject** column. Thus, you are deleting any rows where **Black Friday** is in the email subject. For more information on the PostgreSQL **position** function, refer to the following documentation regarding string
+functions: https://www.postgresql.org/docs/current/functions-string.html.
+
+12. Delete all rows where **25% off all EVs. It's a Christmas Miracle!** and **A New Year, And Some New EVs** can be found in the **email_subject** column:
+```
+DELETE FROM
+bat_emails
+WHERE
+position('25% off all EV' in email_subject)>0;
+DELETE FROM
+bat_emails
+WHERE
+position('Some New EV' in email_subject)>0;
+```
+
+13.  At this stage, you have your final dataset of emails that were sent to customers. Count the number of rows that are left in the sample by writing the following query:
+```
+SELECT
+count(sales_date)
+FROM
+bat_emails;
+```
+You can see that **319** rows are left in the sample:
+```
+ count 
+-------
+   319
+(1 row)
+```
+
+14. Now, you will compute the percentage of emails that were opened relative to sales. Count the emails that were opened by writing the following query:
+```
+SELECT
+count(opened)
+FROM
+bat_emails
+WHERE
+opened='t';
+```
+You can see that **83** emails were opened:
+```
+ count 
+-------
+    83
+(1 row)
+```
+15. Count the customers who received emails and made a purchase. You can determine this by counting the number of unique (or distinct) customers that are in the **bat_emails** table:
+```
+SELECT
+COUNT(DISTINCT(customer_id))
+FROM
+bat_emails;
+```
+You can see that **314** customers who received an email made a purchase:
+```
+count
+-------
+314
+(1 row)
+```
+
+16.  Count the unique (or distinct) customers who made a purchase by writing the following query:
+```
+SELECT
+COUNT(DISTINCT(customer_id))
+FROM
+bat_sales;
+```
+The following is the output of the preceding code:
+```
+ count 
+-------
+  6659
+(1 row)
+```
+17. Calculate the percentage of customers who purchased a **Bat** Scooter after receiving an email:
+```
+SELECT 314.0/6659.0 AS email_rate;
+```
+The output of the preceding query is as follows:
+```
+       email_rate       
+------------------------
+ 0.04715422736146568554
+(1 row)
+```
+**Note**
+In the preceding calculation, you can see that you included a decimal place in the figures (for example, **314.0** instead of a simple integer value of **314**). This is because the resulting value will be represented as a fraction that is less than 1. If you excluded these decimal places, the SQL server would have completed the division operation as integers and the result would be **0**.
+
+Just under 5% of customers who made a purchase received an email regarding the **Bat** Scooter. There is a strong argument to be made that actively increasing the size of the customer base who receive marketing emails could increase **Bat** Scooter sales. But how likely is it that this argument is correct? You must compare this number to the effectiveness of other products' email campaigns, which is called a control or comparison group. Now that you have examined the performance of the email marketing campaign for the **Bat** Scooter, you need a control or comparison group to establish whether the results were consistent with that of other products. Without a group to compare against, you simply do not know whether the email campaign of the **Bat** Scooter was good, bad, or neither. You will investigate performance in the next exercise.
+
+### Analyzing the Performance of the Email Marketing Campaign
+In this exercise, you will investigate the performance of the email marketing campaign for the **Lemon** Scooter to allow for a comparison with the **Bat** Scooter. Your hypothesis is that if the email marketing campaign's performance of the **Bat** Scooter is consistent with another, such as the 2016 **Lemon**, then the reduction in sales cannot be attributed to differences in the email campaigns.
+
+Perform the following steps to complete this exercise:
+
+1. Load the **sqlda** database with psql.
+2. In Activity above, *Analyzing the Difference in the Sales Price Hypothesis*, you tried to compare the sales of the **Lemon** Scooter against the **Bat** Scooter, to find the impact of pricing. In this
+exercise, you will compare the sales of the **Lemon** Scooter against the **Bat** Scooter from another angle, which is the effectiveness of the email campaign. So, first drop the existing **lemon_sales** table, which contains information not related to this exercise:
+```
+DROP TABLE IF EXISTS lemon_sales;
+```
+3. The 2016 **Lemon** Scooter is **product_id=3**. Select **customer_id** and **sales_transaction_date** from the **sale**s table for the 2016 **Lemon** Scooter. Insert this information into a table called **lemon_sales**. Here, the **TIMESTAMP** column **sales_transaction_date** is converted into the **DATE** column **sales_date**:
+```
+SELECT
+customer_id,
+sales_transaction_date::DATE as sales_date
+INTO
+lemon_sales
+FROM
+sales
+WHERE
+product_id=3;
+```
+4. Select all the information from the **emails** database for customers who purchased a 2016 **Lemon** Scooter. Place this information in a new table called **lemon_emails**:
+```
+SELECT
+emails.customer_id,
+emails.email_subject,
+emails.opened,
+emails.sent_date,
+emails.opened_date,
+lemon_sales.sales_date
+INTO
+lemon_emails
+FROM
+emails
+INNER JOIN
+Lemon_sales
+ON
+emails.customer_id=lemon_sales.customer_id;
+```
+5. Identify the date when the production of the 2016 **Lemon** Scooter started, to remove all the emails that were sent before:
+```
+SELECT
+production_start_date
+FROM
+products
+WHERE
+product_id=3;
+```
+The following table shows the **production_start_date** column:
+```
+ production_start_date 
+-----------------------
+ 2015-12-27 00:00:00
+(1 row)
+```
+6. Now that you know the production start date, you can delete the emails that were sent before the start of production of the 2016 **Lemon** Scooter:
+```
+DELETE FROM
+lemon_emails
+WHERE
+sent_date < '2015-12-27';
+```
+7. Remove all the rows where the sent date occurred after the date in the **sales_date** column:
+```
+DELETE FROM
+lemon_emails
+WHERE
+sent_date > sales_date;
+```
+8. Remove all the rows where the sent date occurred more than 30 days before the date in the **sales_date** column:
+```
+DELETE FROM
+lemon_emails
+WHERE
+(sales_date - sent_date) > '30 days';
+```
+9. Remove all the rows from **lemon_emails** where the email subject is not related to the **Lemon** Scooter. Before doing this, you will search for all distinct emails:
+```
+SELECT DISTINCT
+email_subject
+FROM
+lemon_emails;
+```
+The following table shows the distinct email subjects:
+```
+                 email_subject                 
+-----------------------------------------------
+ Tis' the Season for Savings
+ 25% off all EVs. It's a Christmas Miracle!
+ A Brand New Scooter...and Car
+ Like a Bat out of Heaven
+ Shocking Holiday Savings On Electric Scooters
+ Save the Planet with some Holiday Savings.
+ We cut you a deal: 20%% off a Blade
+ An Electric Car for a New Age
+ We Really Outdid Ourselves this Year
+ Black Friday. Green Cars.
+ Zoom Zoom Black Friday Sale
+(11 rows)
+```
+10. Delete the email subjects not related to the **Lemon** Scooter using the **DELETE** command:
+```
+DELETE FROM 
+  lemon_emails 
+WHERE 
+  POSITION('25% off all EVs.' in email_subject)>0;
+
+DELETE FROM 
+  lemon_emails 
+WHERE 
+  POSITION('Like a Bat out of Heaven' in email_subject)>0;
+
+DELETE FROM 
+  lemon_emails 
+WHERE 
+  POSITION('Save the Planet' in email_subject)>0;
+
+DELETE FROM 
+  lemon_emails 
+WHERE 
+  POSITION('An Electric Car' in email_subject)>0;
+
+DELETE FROM 
+  lemon_emails 
+WHERE 
+  POSITION('We cut you a deal' in email_subject)>0;
+
+DELETE FROM 
+  lemon_emails 
+WHERE 
+  POSITION('Black Friday. Green Cars.' in email_subject)>0;
+
+DELETE FROM 
+  lemon_emails 
+WHERE 
+  POSITION('Zoom' in email_subject)>0;
+```
+11. Now, check how many emails to the **lemon_scooter** customers were opened:
+```
+SELECT
+COUNT(opened)
+FROM
+lemon_emails
+WHERE
+opened='t';
+```
+You can see that **127** emails were opened:
+```
+-------
+   127
+(1 row)
+```
+12. List the number of customers who received emails and made a purchase:
+```
+SELECT
+COUNT(DISTINCT(customer_id))
+FROM
+lemon_emails;
+```
+The following result shows that **498** customers made a purchase after receiving emails:
+```
+count
+-------
+498
+(1 row)
+```
+13. Calculate the percentage of customers who opened the received emails and made a purchase:
+```
+SELECT 127.0/498.0 AS email_rate;
+```
+You can see that 25% of customers opened the emails and made a purchase:
+```
+       email_rate       
+------------------------
+ 0.25502008032128514056
+(1 row)
+```
+14. Calculate the number of unique customers who made a purchase:
+```
+SELECT
+COUNT(DISTINCT(customer_id))
+FROM
+lemon_sales;
+```
+You can see that **13854** customers made a purchase:
+```
+ count 
+-------
+ 13854
+(1 row)
+```
+15. Calculate the percentage of customers who made a purchase having received an email. This will enable a comparison with the corresponding figure for the **Bat** Scooter:
+```
+SELECT 498.0/13854.0 AS email_sales;
+```
+The preceding calculation generates a 36% output:
+```
+      email_sales       
+------------------------
+ 0.03594629709831095712
+(1 row)
+```
+You can see that 25% of customers who opened an email made a purchase, which is similar to that figure for the **Bat** Scooter (83/314=26%). You have also calculated that about 3.6% of customers who purchased a **Lemon** Scooter were sent an email, which is much lower than almost 5% of **Bat** Scooter customers.
+
+**Note**
+In this exercise, you investigated the performance of an email marketing campaign for the **Lemon** Scooter to allow for a comparison with the **Bat** Scooter using various SQL techniques. Now, you will review all the exercises and activities you have done in this section and see whether you can draw some meaningful conclusions.
+
+#### Conclusions
+Now that you have collected a range of information about the timing of the product launches, the sales prices of the products, and the marketing campaigns, you can make some conclusions regarding your hypotheses:
+- In Exercise, Launch Timing Analysis, you gathered some evidence to suggest that launch timing could be related to the reduction in sales after the first 2 weeks, although this cannot be proven.
+- There is a correlation between the initial sales rate and the sales price of the scooter, with a reduced sales price trending with a high sales rate (Activity, Analyzing the Difference in the Sales Price Hypothesis).
+- The number of units sold in the first 3 weeks does not directly correlate to the sales price of the product (Activity, Analyzing the Difference in the Sales Price Hypothesis).
+- There is evidence to suggest that a successful marketing campaign could increase the initial sales rate, with an increased email opening rate trending with an increased sales rate (Exercise, Analyzing Sales Growth by Email Opening Rate). Similarly, for the customers receiving email trends, there is an increase in the number with increased sales (Exercise, Analyzing the Performance of the Email Marketing Campaign).
+
+#### In-Field Testing
+At this stage, you have completed your post hoc analysis (that is, data analysis completed after an event) and have evidence to support a couple of theories as to why the sales of the Bat Scooter dropped after the first 2 weeks. However, you cannot confirm these hypotheses to be true, as you
+cannot isolate one from the other, such as pricing difference or email campaign effectiveness.
+
+This is where you need to turn to another tool in your toolkit: in-field testing. As the name suggests, in-field testing is testing hypotheses in the field (for instance, while a new product is being launched or existing sales are being made). One of the most common examples of in-field testing is A/B testing, whereby you randomly divide your users or customers into two groups (A and B) and provide them with a slightly modified experience or environment and observe the result. For example, you randomly assigned customers in group A to a new marketing campaign and customers in group B to the existing marketing campaign. You could then monitor sales and interactions to see whether one campaign was better than the other.
+
+Similarly, if you wanted to test the launch timing, you could launch in Northern California, for example, in early November, and Southern California in early December, and observe the differences.
+
+The essence of in-field testing is that unless you test your post hoc data analysis hypotheses, you will never know whether your hypothesis is true. To test the hypothesis, you must only alter the conditions to be tested—for example, the launch date. To confirm your post hoc analysis, you could recommend that the sales teams apply one or more of the following scenarios and monitor the sales records in real-time to determine the cause of the reduction in sales:
+
+- Release the next scooter product at different times of the year in two regions that have a similar climate and equivalent current sales records. This would help determine whether launch timing had an effect.
+- Release the next scooter product at the same time in regions with equivalent existing sales records at different price points and observe this for differences in sales.
+- Release the next scooter product at the same time and the same price point in regions with equivalent existing sales records and apply two different email marketing campaigns. Track the customers who participated in each campaign and monitor the sales.
+
+## Summary
+n this section, you developed the skills necessary to develop hypotheses for problems and systematically gather the data required to support or reject them. You started this case study with a reasonably difficult problem of explaining an observed discrepancy in sales data and discovered two possible sources (launch timing and marketing campaign) for the difference while rejecting one alternative explanation (sales price).
+
+While being a required skill for any data analyst, being able to understand and apply the scientific method in your exploration of problems will allow you to be more effective and find interesting threads of investigation. In this section, you used the SQL skills you have developed throughout this article, from simple **SELECT** statements to aggregating complex data types, as well as windowing methods. After completing this chapter, you will be able to continue and repeat this type of analysis
+in your own data analysis projects to help find actionable insights.
 
 
 
